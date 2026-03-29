@@ -102,6 +102,16 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 .rtbl td,.rtbl th{padding:4px 6px;border-bottom:1px solid rgba(201,168,76,.2)}
 .rtbl th{font-family:'Cinzel',serif;font-size:8px;color:var(--gold);font-weight:400}
 .wrow td{color:var(--gold);font-weight:600}
+/* HTP overlay — laptop */
+@media(min-width:600px){
+  #HTP_OV p{font-size:15px !important;line-height:1.8 !important}
+  #HTP_OV div[style*="font-size:11px"]{font-size:13px !important}
+  #HTP_OV div[style*="font-size:12px"]{font-size:15px !important}
+  #HTP_OV div[style*="font-size:13px"]{font-size:16px !important}
+  #HTP_OV div[style*="font-size:10px"]{font-size:12px !important}
+  #HTP_OV button[id^="HTP_TAB"]{font-size:12px !important;padding:10px 16px !important}
+  #HTP_OV #HTP_OK{font-size:15px !important;padding:14px !important}
+}
 /* SHUFFLE */
 .shov{position:absolute;inset:0;background:rgba(0,0,0,.9);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:300}
 .shdeck{position:relative;width:80px;height:100px;margin:0 auto}
@@ -373,6 +383,11 @@ function validCombo(cs){return cs.length>=3&&(isGroup(cs)||isRun(cs));}
 function comboType(cs){return isGroup(cs)?'grupo':'escalera';}
 function canFit(comboCards,c){return validCombo([...comboCards,c]);}
 function hasBothWilds(hand){return hand.some(c=>c.jk)&&hand.some(c=>c.wl);}
+// Detecta si un jugador usó ambos comodines (en mano O en combos bajados)
+function usedBothWilds(i){
+  const all=[...S.hands[i],...(S.shown[i]||[]).flatMap(combo=>combo.cards)];
+  return all.some(c=>c.jk)&&all.some(c=>c.wl);
+}
 
 // Ordena las cartas de un combo para mostrarlo:
 // - Grupos: por palo (♥♦♣♠) para que se vea limpio, comodín al final
@@ -565,7 +580,7 @@ function showPenaltyAnimation(penalties,callback){
 
 function detectPenalties(){
   const scores=S.hands.map(h=>h.reduce((a,c)=>a+cv(c),0));
-  const adj=scores.map((s,i)=>s+(hasBothWilds(S.hands[i])?60:0));
+  const adj=scores.map((s,i)=>s+(usedBothWilds(i)?60:0));
   const min=Math.min(...adj);
   const winners=adj.map((s,i)=>s===min?i:-1).filter(i=>i>=0);
   const tie=winners.length>1;
@@ -574,7 +589,7 @@ function detectPenalties(){
   const penalties=[];
   for(let i=0;i<3;i++){
     if(winners.includes(i))continue;
-    const tieneComodines=hasBothWilds(S.hands[i]);
+    const tieneComodines=usedBothWilds(i);
     const golpoSinGanar=gp===i&&!gWon;
     if(golpoSinGanar||tieneComodines){
       const reason=golpoSinGanar?'declaró GOLPEADO pero no ganó':
@@ -875,7 +890,7 @@ function calcPayments(winners,adj,tie,gp,gWon){
 
   for(let i=0;i<S.np;i++){
     if(i===winner)continue;
-    const tieneComodines=hasBothWilds(S.hands[i]);
+    const tieneComodines=usedBothWilds(i);
     const golpoSinGanar=gp===i&&!gWon;
     const esPenalizado=golpoSinGanar||tieneComodines;
     const monto=esPenalizado?BET*2:BET;
@@ -2082,7 +2097,7 @@ function drawActs(){
   // ── FASE REVISIÓN MESA FINAL ──
   if(S.phase==='mesa_final'){
     const scores=S.hands.map(h=>h.reduce((a,c)=>a+cv(c),0));
-    const adj=scores.map((s,i)=>s+(hasBothWilds(S.hands[i])?60:0));
+    const adj=scores.map((s,i)=>s+(usedBothWilds(i)?60:0));
     const summary=S.hands.map((h,i)=>{
       const pts=adj[i];
       return `<span style="color:${PCOLOR[i]};font-weight:700">${PNAME(i)}: ${pts}pts</span>`;
@@ -2195,7 +2210,7 @@ function showFinalOv(){
   rmEl('OV');
   const ov=mkEl('div','ov','OV');
   const scores=S.hands.map(h=>h.reduce((a,c)=>a+cv(c),0));
-  const penalty=S.hands.map(h=>hasBothWilds(h)?60:0);
+  const penalty=S.hands.map((h,i)=>usedBothWilds(i)?60:0);
   const adj=scores.map((s,i)=>s+penalty[i]);
   const min=Math.min(...adj);
   const winners=adj.map((s,i)=>s===min?i:-1).filter(i=>i>=0);
@@ -2464,12 +2479,12 @@ function showHowToPlay(onClose){
     ov.innerHTML=`
       <div style="width:100%;display:flex;flex-direction:column;height:100%">
         <div style="padding:18px 20px 10px;border-bottom:1px solid rgba(201,168,76,.15)">
-          <div style="font-family:Cinzel,serif;font-size:16px;color:var(--gold);text-align:center;letter-spacing:.08em">🃏 Cómo se juega</div>
+          <div style="font-family:Cinzel,serif;font-size:clamp(16px,2.5vw,22px);color:var(--gold);text-align:center;letter-spacing:.08em">🃏 Cómo se juega</div>
         </div>
         <div style="display:flex;overflow-x:auto;gap:0;border-bottom:1px solid rgba(201,168,76,.15);flex-shrink:0;scrollbar-width:none">
           ${tabs.map(t=>`<button id="HTP_TAB_${t.id}" style="flex-shrink:0;padding:8px 12px;background:${tabActivo===t.id?'rgba(201,168,76,.12)':'transparent'};border:none;border-bottom:2px solid ${tabActivo===t.id?'var(--gold)':'transparent'};color:${tabActivo===t.id?'var(--gold)':'rgba(232,220,200,.5)'};font-family:Cinzel,serif;font-size:10px;cursor:pointer;white-space:nowrap;touch-action:manipulation">${t.label}</button>`).join('')}
         </div>
-        <div style="flex:1;overflow-y:auto;padding:16px 20px">
+        <div style="flex:1;overflow-y:auto;padding:clamp(16px,3vw,28px) clamp(20px,4vw,40px)">
           ${contenido[tabActivo]}
         </div>
         <div style="padding:12px 20px;border-top:1px solid rgba(201,168,76,.15);flex-shrink:0">
