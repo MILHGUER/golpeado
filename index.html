@@ -385,8 +385,12 @@ function canFit(comboCards,c){return validCombo([...comboCards,c]);}
 function hasBothWilds(hand){return hand.some(c=>c.jk)&&hand.some(c=>c.wl);}
 // Detecta si un jugador usó ambos comodines (en mano O en combos bajados)
 function usedBothWilds(i){
-  const all=[...S.hands[i],...(S.shown[i]||[]).flatMap(combo=>combo.cards)];
-  return all.some(c=>c.jk)&&all.some(c=>c.wl);
+  try{
+    const handCards=S.hands[i]||[];
+    const shownCards=(S.shown[i]||[]).flatMap(combo=>(combo&&combo.cards)||[]);
+    const all=[...handCards,...shownCards];
+    return all.some(c=>c&&c.jk)&&all.some(c=>c&&c.wl);
+  }catch(e){return false;}
 }
 
 // Ordena las cartas de un combo para mostrarlo:
@@ -587,7 +591,7 @@ function detectPenalties(){
   const gp=S.golpBy;const gWon=gp>=0&&adj[gp]===min&&!tie;
   if(tie)return [];
   const penalties=[];
-  for(let i=0;i<3;i++){
+  for(let i=0;i<S.np;i++){
     if(winners.includes(i))continue;
     const tieneComodines=usedBothWilds(i);
     const golpoSinGanar=gp===i&&!gWon;
@@ -2094,35 +2098,17 @@ function drawActs(){
 
   // ── FASE REVISIÓN MESA FINAL ──
   if(S.phase==='mesa_final'){
-    const scores=S.hands.map(h=>h.reduce((a,c)=>a+cv(c),0));
-    const adj=scores.map((s,i)=>s+(usedBothWilds(i)?60:0));
-    const summary=S.hands.map((h,i)=>{
-      const pts=adj[i];
-      return `<span style="color:${PCOLOR[i]};font-weight:700">${PNAME(i)}: ${pts}pts</span>`;
-    }).join(' &nbsp;·&nbsp; ');
-
-    // texto de penalizaciones visible
-    const penalties=detectPenalties();
-    let penHtml='';
-    if(penalties.length){
-      penHtml=penalties.map(p=>`
-        <div style="background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.35);border-radius:6px;padding:5px 10px;font-size:9px;text-align:center;width:100%">
-          ⚠️ <span style="color:${p.color};font-weight:700">${p.name}</span>
-          <span style="color:rgba(232,220,200,.8)"> paga el <strong style="color:#E24B4A">doble</strong> — ${p.reason}</span>
-        </div>`).join('');
-    }
-
-    ACT.innerHTML=`
-      <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:100%">
-        <div style="font-size:9px;color:rgba(232,220,200,.7);text-align:center">${summary}</div>
-        ${penHtml}
-        <button class="btn pri" style="width:100%;font-size:11px;padding:8px" onclick="verResultados()">
-          Ver resultados finales →
-        </button>
-      </div>`;
-    // fix touch
+    let summary='';let penHtml='';
+    try{
+      const scores=S.hands.map(h=>h.reduce((a,c)=>a+cv(c),0));
+      const adj=scores.map((s,i)=>s+(usedBothWilds(i)?60:0));
+      summary=S.hands.map((h,i)=>'<span style="color:'+PCOLOR[i]+';font-weight:700">'+PNAME(i)+': '+adj[i]+'pts</span>').join(' &nbsp;·&nbsp; ');
+      const pens=detectPenalties();
+      if(pens.length){penHtml=pens.map(p=>'<div style="background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.35);border-radius:6px;padding:5px 10px;font-size:9px;text-align:center;width:100%">⚠️ <span style="color:'+p.color+';font-weight:700">'+p.name+'</span> <span style="color:rgba(232,220,200,.8)"> paga el <strong style="color:#E24B4A">doble</strong> — '+p.reason+'</span></div>').join('');}
+    }catch(e){console.log('drawActs error:',e);}
+    ACT.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:100%">'+(summary?'<div style="font-size:9px;color:rgba(232,220,200,.7);text-align:center">'+summary+'</div>':'')+penHtml+'<button class="btn pri" style="width:100%;font-size:11px;padding:8px" onclick="verResultados()">Ver resultados finales →</button></div>';
     const btn=ACT.querySelector('button');
-    btn.addEventListener('touchend',e=>{e.preventDefault();verResultados();},{passive:false});
+    if(btn)btn.addEventListener('touchend',e=>{e.preventDefault();verResultados();},{passive:false});
     return;
   }
 
