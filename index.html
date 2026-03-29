@@ -2836,29 +2836,20 @@ function handleEstadoRemoto(estado){
   if(!soyJugador)return;
 
   // ── GOLPEADO REVEAL ──
-  if(estado.fase==='golpeado_reveal'||estado.fase==='mesa_final'&&estado.phase==='mesa_final'){
-    // si el estado publicado tiene phase=mesa_final, redirigir al bloque correcto
-    if(estado.phase==='mesa_final'){
-      rmEl('LOBBY_OV');rmEl('SHUF');
-      aplicarEstadoRemoto(estado);
-      redraw();
-      const penalties=detectPenalties();
-      if(penalties.length)setTimeout(()=>showPenaltyAnimation(penalties,()=>redraw()),600);
-      return;
-    }
+  if(estado.fase==='golpeado_reveal'){
     rmEl('LOBBY_OV');rmEl('SHUF');
+    // si el phase real publicado ya es mesa_final, saltar al bloque correcto
+    if(estado.phase==='mesa_final'){
+      aplicarEstadoRemoto(estado);
+      return; // aplicarEstadoRemoto ya maneja mesa_final internamente
+    }
     const prevPhase=S.phase;
     const prevRevIdx=S._revIdx;
     const prevRevPid=S._revPid;
     aplicarEstadoRemoto(estado);
 
-    // Si después de aplicar el estado ya estamos en mesa_final, manejar directamente
-    if(S.phase==='mesa_final'){
-      redraw();
-      const penalties=detectPenalties();
-      if(penalties.length)setTimeout(()=>showPenaltyAnimation(penalties,()=>redraw()),600);
-      return;
-    }
+    // Si después de aplicar el estado ya estamos en mesa_final, ya lo maneja aplicarEstadoRemoto
+    if(S.phase==='mesa_final') return;
 
     if(prevPhase!=='golpeado_reveal'&&prevPhase!=='mesa_final'){
       const savedPhase=S.phase;
@@ -3369,6 +3360,16 @@ function aplicarEstadoRemoto(estado){
 
   if(S.phase==='end'&&!$('OV')){
     setTimeout(showFinalOv,400);
+  }
+
+  // en multi: si llegamos a mesa_final via cualquier ruta, forzar redraw con botón
+  if(S.phase==='mesa_final'){
+    redraw();
+    const penalties=detectPenalties();
+    if(penalties.length&&!$('PNLT_OV')){
+      setTimeout(()=>showPenaltyAnimation(penalties,()=>redraw()),600);
+    }
+    return;
   }
 
   // en multi: si estamos en golpeado_reveal y es mi turno, activar UI
