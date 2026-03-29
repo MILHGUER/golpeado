@@ -627,30 +627,29 @@ function loadBank(){
 
 // carga el banco desde el estado remoto (Supabase) si está disponible
 function syncBankFromRemote(estado){
-  if(!estado||!estado.bank)return;
+  // ya no usamos estado.bank — el banco se lee directo desde Supabase
+}
+// carga el banco desde Supabase (para jugadores no-host)
+async function loadBankFromSupabase(){
   const salaId=(typeof MP!=='undefined'&&MP.mode==='multi'&&MP.salaId)?MP.salaId:null;
   if(!salaId)return;
   try{
-    // guardar localmente el banco publicado por el host
-    localStorage.setItem('golpeado_bank_'+salaId,JSON.stringify(estado.bank));
-    BANK=null; // forzar recarga
+    const row=await sbGet('bank_'+salaId);
+    if(row&&row.estado){
+      localStorage.setItem('golpeado_bank_'+salaId,JSON.stringify(row.estado));
+      BANK=null; // forzar recarga
+    }
   }catch(e){}
 }
 function saveBank(bank){
   try{
     const salaId=(typeof MP!=='undefined'&&MP.mode==='multi'&&MP.salaId)?MP.salaId:null;
     if(salaId){
+      // guardar en localStorage
       localStorage.setItem('golpeado_bank_'+salaId,JSON.stringify(bank));
-      // publicar banco en Supabase para que todos los jugadores lo lean
+      // publicar en Supabase en clave separada para no pisar el estado del juego
       if(MP.isHost){
-        sbGet(salaId).then(row=>{
-          if(row){
-            const est=row.estado||{};
-            est.bank=bank;
-            est.ts=Date.now();
-            sbSet(salaId,est).catch(()=>{});
-          }
-        }).catch(()=>{});
+        sbSet('bank_'+salaId,bank).catch(()=>{});
       }
     } else {
       const data=Array.isArray(bank)?bank:(bank.matrix||bank);
@@ -660,6 +659,37 @@ function saveBank(bank){
 }
 
 let BANK=null; // se inicializa lazy cuando se necesita
+let _revTimer=null;      // timeout del temporizador de revelación
+let _revTimerSec=0;      // segundos restantes
+let _revTimerInterval=null; // interval del contador
+const REV_TIMEOUT=120;   // segundos por turno de revelación
+
+function startRevTimer(){
+  clearRevTimer();
+  _revTimerSec=REV_TIMEOUT;
+  // actualizar el display cada segundo
+  _revTimerInterval=setInterval(()=>{
+    _revTimerSec--;
+    redraw(); // refresca el contador visible
+    if(_revTimerSec<=0){
+      clearRevTimer();
+      // tiempo agotado: listo automático
+      if(S.phase==='golpeado_reveal'&&S._revPid===0&&!S.over){
+        S.msg='⏱ ¡Tiempo agotado! Se registraron tus cartas como sobrantes.';
+        doListo();
+      }
+    }
+  },1000);
+}
+
+function clearRevTimer(){
+  if(_revTimerInterval){clearInterval(_revTimerInterval);_revTimerInterval=null;}
+  if(_revTimer){clearTimeout(_revTimer);_revTimer=null;}
+  _revTimerSec=0;
+}
+
+function getRevTimerSec(){return _revTimerSec;}
+
 function getBank(){if(!BANK)BANK=loadBank();return BANK;}
 let BET=0; // apuesta actual de la partida
 
@@ -719,19 +749,14 @@ async function showCuentas(){
   ov.innerHTML='<div style="color:var(--gold);font-family:Cinzel,serif;font-size:14px">💰 Cargando cuentas...</div>';
   $('G').appendChild(ov);
 
-  // en multi: intentar cargar banco actualizado desde Supabase primero
+  // en multi: cargar banco actualizado desde Supabase
   if(MP.mode==='multi'&&MP.salaId){
-    try{
-      const row=await sbGet(MP.salaId);
-      if(row&&row.estado&&row.estado.bank){
-        syncBankFromRemote(row.estado);
-      }
-    }catch(e){}
+    await loadBankFromSupabase();
   }
 
   // obtener banco y nombres
   const bankData=loadBank();
-  const bankMatrix=MP.mode==='multi'?(bankData.matrix||[[0,0,0],[0,0,0],[0,0,0]]):bankData;
+  const bankMatrix=MP.mode==='multi'?(bankData.matrix||Array.from({length:np},()=>Array(np).fill(0))):bankData;
   // nombres guardados en el banco (para cuando se mira después de la partida)
   const savedNames=(MP.mode==='multi'&&bankData.names&&bankData.names.length)?bankData.names:null;
   const getName=(i)=>savedNames?savedNames[i]:(PNAME(i));
@@ -916,14 +941,21 @@ function calcPayments(winners,adj,tie,gp,gWon){
   // obtener/inicializar banco
   let bankMatrix;
   if(MP.mode==='multi'){
+    // siempre leer fresh del localStorage para tener el acumulado correcto
     BANK=loadBank();
-    if(!BANK||!BANK.matrix)BANK={matrix:[[0,0,0],[0,0,0],[0,0,0]],names:[]};
+    if(!BANK||!BANK.matrix){
+      BANK={matrix:Array.from({length:S.np},()=>Array(S.np).fill(0)),names:[]};
+    }
+    // asegurar que la matriz tiene el tamaño correcto para S.np jugadores
+    for(let r=0;r<S.np;r++){
+      if(!BANK.matrix[r])BANK.matrix[r]=Array(S.np).fill(0);
+      while(BANK.matrix[r].length<S.np)BANK.matrix[r].push(0);
+    }
     bankMatrix=BANK.matrix;
-    // guardar nombres actuales de los jugadores
     BANK.names=Array.from({length:S.np},(_,i)=>PNAME(i));
   } else {
     if(!BANK)BANK=loadBank();
-    if(!BANK||!Array.isArray(BANK))BANK=[[0,0,0],[0,0,0],[0,0,0]];
+    if(!BANK||!Array.isArray(BANK))BANK=Array.from({length:S.np},()=>Array(S.np).fill(0));
     bankMatrix=BANK;
   }
 
@@ -948,6 +980,7 @@ function calcPayments(winners,adj,tie,gp,gWon){
 
 function startGame(){
   UID=0;
+  clearRevTimer();
   Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null});
   redraw();
   showBetScreen(); // primero apuesta, luego baraja
@@ -1484,6 +1517,7 @@ function startReveal(){
 function revealNext(){
   if(!S._revOrd)return;
   if(S._revIdx>=S._revOrd.length){
+    clearRevTimer(); // limpiar timer al terminar revelación
     S.phase='mesa_final';S._revPid=-1;
     S.msg='¡Todos mostraron su juego! Presioná Ver resultados.';
     redraw(); // muestra botón "Ver resultados" inmediatamente
@@ -1501,11 +1535,15 @@ function revealNext(){
   if(MP.mode==='multi'){
     if(pid===0){
       S.msg='Tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.';
+      redraw();
+      mpPublicarEstado();
+      startRevTimer(); // arrancar temporizador solo para el jugador activo
     } else {
       S.msg=PNAME(pid)+' está mostrando su juego...';
+      clearRevTimer();
+      redraw();
+      mpPublicarEstado();
     }
-    redraw();
-    mpPublicarEstado();
   } else {
     if(pid!==0){
       botShowOne(pid);autoFit(pid);
@@ -1515,11 +1553,13 @@ function revealNext(){
     } else {
       S.msg='Tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.';
       redraw();
+      startRevTimer(); // arrancar temporizador en modo solo también
     }
   }
 }
 
 function doListo(){
+  clearRevTimer(); // cancelar temporizador al presionar listo
   const pts=S.hands[0].reduce((a,c)=>a+cv(c),0);
   const miNombre=MP.mode==='multi'?(MP.myName||'Tú'):'Tú';
   S._revSel=new Set();S._revIdx++;S._revPid=-1;
@@ -2044,6 +2084,13 @@ function drawCenter(){
 
 function drawMsg(){
   const el=$('MSG');
+  // en revelación: mostrar tiempo restante para todos si hay timer
+  if(S.phase==='golpeado_reveal'&&S._revPid>0){
+    // otro jugador está mostrando — no hay timer local, solo msg
+    el.textContent=S.msg;
+    el.className='';
+    return;
+  }
   el.textContent=S.msg;
   // turno del jugador → parpadeo dorado
   const esMiTurno=(S.cur===0&&!S.over&&(S.phase==='play'||S.phase==='drew'||S.phase==='took_discard'||S.phase==='first_discard'));
@@ -2195,6 +2242,21 @@ function drawActs(){
       // sobrantes sin más opciones
       listoLabel='✓ Listo — '+pts+' pts sobrantes';
       listoStyle=`width:100%;padding:8px;border-radius:7px;border:none;background:${color};color:#1a1230;font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 10px rgba(201,168,76,.4)`;
+    }
+    // mostrar contador de tiempo si está corriendo
+    const seg=getRevTimerSec();
+    if(seg>0){
+      const pct=seg/REV_TIMEOUT*100;
+      const timerColor=seg>30?'#7be87b':seg>10?'#E8A84C':'#E24B4A';
+      h+=`<div style="width:100%;max-width:300px;margin-top:2px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <span style="font-size:9px;color:rgba(232,220,200,.5);font-family:Cinzel,serif">⏱ Tiempo restante</span>
+          <span style="font-size:11px;font-weight:700;color:${timerColor};font-family:Cinzel,serif">${seg}s</span>
+        </div>
+        <div style="width:100%;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${timerColor};border-radius:2px;transition:width .9s linear"></div>
+        </div>
+      </div>`;
     }
     h+=`<button style="${listoStyle}" onclick="revealListo()">${listoLabel}</button>`;
     ACT.innerHTML=h;
@@ -2634,6 +2696,8 @@ function showNombreScreen(accion){
   const back=ov.querySelector('#NOM_BACK');
   const ok=ov.querySelector('#NOM_OK');
   const err=ov.querySelector('#NOM_ERR');
+  // pre-cargar nombre guardado
+  try{const n=localStorage.getItem('golpeado_nombre');if(n)inp.value=n;}catch(e){}
   setTimeout(()=>{
     inp.focus();
     // iOS: scroll al input cuando aparece el teclado
@@ -2650,6 +2714,8 @@ function showNombreScreen(accion){
     if(!nombre){err.textContent='Ingresá tu nombre para continuar.';return;}
     MP.myName=nombre;
     MP.myId=genId();
+    // guardar nombre para facilitar reconexión
+    try{localStorage.setItem('golpeado_nombre',nombre);}catch(e){}
     if(accion==='crear'){
       MP.salaId=genId(6);
       MP.isHost=true;
@@ -2744,7 +2810,30 @@ async function unirseASala(){
     const row=await sbGet(MP.salaId);
     if(!row){showError('Sala no encontrada. Verificá el código.');return;}
     const estado=row.estado;
-    if(estado.fase!=='lobby'){showError('La partida ya está en curso.');return;}
+
+    // ── RECONEXIÓN: verificar si el jugador ya estaba en la sala ──
+    const jugExistente=estado.jugadores&&estado.jugadores.find(
+      j=>j.id===MP.myId||(j.nombre&&MP.myName&&j.nombre.toLowerCase()===MP.myName.toLowerCase())
+    );
+    if(jugExistente){
+      // reconectar: recuperar slot y continuar
+      MP.mySlot=jugExistente.slot;
+      MP.isHost=jugExistente.id===(estado.host||estado.jugadores[0]?.id);
+      jugExistente.id=MP.myId; // actualizar ID por si cambió
+      jugExistente.conectado=true;
+      estado.ts=Date.now();
+      await sbSet(MP.salaId,estado);
+      if(estado.fase==='lobby'){
+        suscribirSala(()=>buildLobbyUI(estado,MP.isHost));
+      } else {
+        // partida en curso: reconectar directo al juego
+        suscribirSala(()=>handleEstadoRemoto(estado));
+      }
+      return;
+    }
+
+    // ── NUEVO JUGADOR ──
+    if(estado.fase!=='lobby'){showError('La partida ya está en curso. Si eras parte de esta sala, ingresá con el mismo nombre que usaste.');return;}
     if(estado.jugadores.length>=3){showError('La sala está llena (máx. 3 jugadores).');return;}
     // agregar jugador
     const slot=estado.jugadores.length;
@@ -2791,7 +2880,6 @@ function handleEstadoRemoto(estado){
     } else if(MP.myId){
       // limpiar estado del juego anterior al volver al lobby
       rmEl('OV');rmEl('SHUF');rmEl('PNLT_OV');rmEl('CONFIRM_LISTO');
-      syncBankFromRemote(estado);
       const np=estado.jugadores?estado.jugadores.length:S.np||2;
       Object.assign(S,{deck:[],disc:[],hands:Array.from({length:np},()=>[]),shown:Array.from({length:np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null});
       redraw(); // limpiar tablero
@@ -3335,9 +3423,7 @@ function showShufOvMulti(onCut){
 function aplicarEstadoRemoto(estado){
   rmEl('LOBBY_OV');
   MP.mode='multi';
-  // sincronizar banco desde el host si está disponible en el estado
-  syncBankFromRemote(estado);
-  BANK=null; // forzar recarga lazy
+  BANK=null; // forzar recarga lazy desde localStorage
 
   // guardar info de jugadores para nombres
   MP._jugadores=estado.jugadores||[];
@@ -3420,14 +3506,24 @@ function aplicarEstadoRemoto(estado){
     return;
   }
 
-  // en multi: si estamos en golpeado_reveal y es mi turno, activar UI
+  // en multi: manejar timer de revelación según turno
   if(MP.mode==='multi'&&S.phase==='golpeado_reveal'){
     const esMiTurno=S._revPid===0;
     if(esMiTurno&&!S.over){
-      // es mi turno de mostrar
-      S.msg='Tu turno de mostrar — seleccióná tus cartas para bajar combos o encajar.';
+      S.msg='Tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.';
       redraw();
+      // arrancar timer solo si no está ya corriendo (evitar reinicio en cada poll)
+      if(getRevTimerSec()===0){
+        startRevTimer();
+      }
+    } else {
+      // no es mi turno — cancelar cualquier timer que esté corriendo
+      clearRevTimer();
     }
+  }
+  // limpiar timer si ya no estamos en revelación
+  if(S.phase!=='golpeado_reveal'){
+    clearRevTimer();
   }
 }
 
