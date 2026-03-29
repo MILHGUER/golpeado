@@ -728,7 +728,7 @@ function showCuentas(){
   html+=`</table>`;
   html+=`<div style="display:flex;gap:8px;width:100%;max-width:280px;margin-top:4px;flex-wrap:wrap">
     <button id="CUE_SHR" style="flex:2;padding:8px;border-radius:6px;border:1.5px solid #25D366;background:#25D36622;color:#25D366;font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">📤 Compartir</button>
-    <button id="CUE_RST" style="flex:1;padding:8px;border-radius:6px;border:1.5px solid rgba(226,75,74,.5);background:transparent;color:#E24B4A;font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">Resetear</button>
+    ${MP.isHost||MP.mode!=='multi'?'<button id="CUE_RST" style="flex:1;padding:8px;border-radius:6px;border:1.5px solid rgba(226,75,74,.5);background:transparent;color:#E24B4A;font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">Resetear</button>':''}
     <button id="CUE_CLO" style="flex:2;padding:8px;border-radius:6px;border:1.5px solid var(--gold);background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation">Cerrar</button>
   </div>`;
 
@@ -751,7 +751,7 @@ function showCuentas(){
   const rstBtn=ov.querySelector('#CUE_RST');
   const shrBtn=ov.querySelector('#CUE_SHR');
   cloBtn.addEventListener('click',clo);cloBtn.addEventListener('touchend',e=>{e.preventDefault();clo();},{passive:false});
-  rstBtn.addEventListener('click',rst);rstBtn.addEventListener('touchend',e=>{e.preventDefault();rst();},{passive:false});
+  if(rstBtn){rstBtn.addEventListener('click',rst);rstBtn.addEventListener('touchend',e=>{e.preventDefault();rst();},{passive:false});}
   shrBtn.addEventListener('click',shr);shrBtn.addEventListener('touchend',e=>{e.preventDefault();shr();},{passive:false});
 }
 
@@ -1627,6 +1627,9 @@ function nuevaPartida(){
   if(MP.mode==='multi'){
     // en multi: volver al lobby de la misma sala para jugar otra partida
     stopPoll();
+    // ── LIMPIAR estado del juego anterior completamente ──
+    Object.assign(S,{deck:[],disc:[],hands:Array.from({length:S.np},()=>[]),shown:Array.from({length:S.np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null});
+    redraw(); // limpiar el tablero visualmente antes de mostrar lobby
     MP.mySlot=MP.isHost?0:MP.mySlot; // mantener slot
     // publicar estado de lobby para que todos vean la sala de espera
     const lobbyState={
@@ -2744,8 +2747,16 @@ function handleEstadoRemoto(estado){
   // ── LOBBY ──
   if(estado.fase==='lobby'){
     const ov=$('LOBBY_OV');
-    if(ov)actualizarLobbyUI(estado);
-    else if(MP.myId)buildLobbyUI(estado,MP.isHost);
+    if(ov){
+      actualizarLobbyUI(estado);
+    } else if(MP.myId){
+      // limpiar estado del juego anterior al volver al lobby
+      rmEl('OV');rmEl('SHUF');rmEl('PNLT_OV');rmEl('CONFIRM_LISTO');
+      const np=estado.jugadores?estado.jugadores.length:S.np||2;
+      Object.assign(S,{deck:[],disc:[],hands:Array.from({length:np},()=>[]),shown:Array.from({length:np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null});
+      redraw(); // limpiar tablero
+      buildLobbyUI(estado,MP.isHost);
+    }
     return;
   }
 
@@ -2938,10 +2949,20 @@ function buildLobbyUI(estado,isHost){
     `:`
     <div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center;font-style:italic">Esperando que el host inicie la partida...</div>
     <div id="LB_APUESTA_LBL" style="font-size:11px;color:var(--gold);text-align:center;font-weight:700"></div>
-    `}`;
+    `}
+    <div style="display:flex;gap:8px;width:100%;max-width:300px;margin-top:4px">
+      <button id="LB_HTP" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">❓ Cómo jugar</button>
+      <button id="LB_CUE" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(201,168,76,.4);background:transparent;color:rgba(201,168,76,.7);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">💰 Cuentas</button>
+    </div>`;
 
   $('G').appendChild(ov);
   actualizarLobbyUI(estado);
+
+  // botones cómo jugar y cuentas en lobby
+  const htpBtn=ov.querySelector('#LB_HTP');
+  if(htpBtn){const doHtp=()=>showHowToPlay();htpBtn.addEventListener('click',doHtp);htpBtn.addEventListener('touchend',e=>{e.preventDefault();doHtp();},{passive:false});}
+  const cueBtn=ov.querySelector('#LB_CUE');
+  if(cueBtn){const doCue=()=>showCuentas();cueBtn.addEventListener('click',doCue);cueBtn.addEventListener('touchend',e=>{e.preventDefault();doCue();},{passive:false});}
 
   // copiar enlace
   const copyBtn=ov.querySelector('#LB_COPY');
