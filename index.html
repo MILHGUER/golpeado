@@ -1444,7 +1444,7 @@ function revealNext(){
     S.phase='mesa_final';S._revPid=-1;
     S.msg='¡Todos mostraron su juego! Presioná Ver resultados.';
     redraw(); // muestra botón "Ver resultados" inmediatamente
-    if(MP.mode==='multi')mpPublicarEstado();
+    if(MP.mode==='multi')setTimeout(()=>mpPublicarEstado(),50);
     // penalizaciones como overlay encima, no bloquean el botón
     const penalties=detectPenalties();
     if(penalties.length){
@@ -1483,10 +1483,8 @@ function doListo(){
   S.msg=pts===0?'¡'+miNombre+' sin sobrantes! Esperando...':miNombre+': '+pts+' pts sobrantes.';
   redraw();
   if(MP.mode==='multi'){
-    // Avanzar inmediatamente y publicar el nuevo estado
-    revealNext(); // esto setea mesa_final si es el último, o el nuevo _revPid
-    // Publicar después de revealNext para que incluya el nuevo estado
-    setTimeout(()=>mpPublicarEstado(),100);
+    // revealNext() ya llama mpPublicarEstado() internamente
+    revealNext();
   } else {
     setTimeout(revealNext,600);
   }
@@ -2838,7 +2836,16 @@ function handleEstadoRemoto(estado){
   if(!soyJugador)return;
 
   // ── GOLPEADO REVEAL ──
-  if(estado.fase==='golpeado_reveal'){
+  if(estado.fase==='golpeado_reveal'||estado.fase==='mesa_final'&&estado.phase==='mesa_final'){
+    // si el estado publicado tiene phase=mesa_final, redirigir al bloque correcto
+    if(estado.phase==='mesa_final'){
+      rmEl('LOBBY_OV');rmEl('SHUF');
+      aplicarEstadoRemoto(estado);
+      redraw();
+      const penalties=detectPenalties();
+      if(penalties.length)setTimeout(()=>showPenaltyAnimation(penalties,()=>redraw()),600);
+      return;
+    }
     rmEl('LOBBY_OV');rmEl('SHUF');
     const prevPhase=S.phase;
     const prevRevIdx=S._revIdx;
@@ -2878,6 +2885,12 @@ function handleEstadoRemoto(estado){
   if(estado.fase==='jugando'){
     rmEl('LOBBY_OV');rmEl('SHUF');
     aplicarEstadoRemoto(estado);
+    // si el phase real es mesa_final (timing), mostrarlo correctamente
+    if(S.phase==='mesa_final'){
+      redraw();
+      const penalties=detectPenalties();
+      if(penalties.length)setTimeout(()=>showPenaltyAnimation(penalties,()=>redraw()),600);
+    }
   }
 
   // ── MESA FINAL — todos ven "Ver resultados" ──
@@ -3339,7 +3352,7 @@ function aplicarEstadoRemoto(estado){
     else if(S._revPid>0) S.msg=PNAME(S._revPid)+' está mostrando su juego...';
     else S.msg=estado.msg||'';
   } else if(S.phase==='mesa_final'){
-    S.msg='Revisá la mesa y presioná Ver resultados cuando estés listo.';
+    S.msg='¡Todos mostraron su juego! Presioná Ver resultados.';
   } else {
     S.msg=estado.msg||'';
   }
