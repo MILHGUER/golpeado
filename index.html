@@ -247,7 +247,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
     <div id="HUD"></div>
     <div id="ACT"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:0 4px">
-      <div class="plbl">Tu mano — toca para seleccionar · arrastra para ordenar</div>
+      <div class="plbl">Tu mano — toca para seleccionar · arrastra para ordenar <span id="MY_VOICE_IND" style="font-size:13px"></span></div>
       <button id="SORT_BTN" ontouchend="event.preventDefault();sortHand()" onclick="sortHand()" style="font-family:Cinzel,serif;font-size:8px;color:rgba(201,168,76,.6);border:1px solid rgba(201,168,76,.25);background:transparent;border-radius:4px;padding:2px 7px;cursor:pointer;white-space:nowrap;touch-action:manipulation;flex-shrink:0">⇕ Ordenar</button>
     </div>
     <div class="hwrap"><div id="PH"></div></div>
@@ -2176,6 +2176,12 @@ function drawHand(){
       PH.appendChild(mkFace(c,true));
     }
   });
+  // indicador de voz propio junto al label de la mano
+  const myVoiceInd=$('MY_VOICE_IND');
+  if(myVoiceInd){
+    myVoiceInd.textContent=VOICE.enabled?(VOICE.speaking?'🔊':'🎙️'):'';
+  }
+
   // mostrar puntos propios debajo de la mano durante revelación y mesa final
   const handPts=$('HAND_PTS');
   if(handPts){
@@ -2217,7 +2223,7 @@ function drawHUD(){
     '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv">'+S.shown[0].length+'</span><span>combos</span></div>'+
     chipHtml+
     '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv" style="color:'+turnoColor+';font-size:'+fontSize+'">'+turnoNombre+'</span><span>turno</span></div>'+
-    (VOICE.enabled?'<div style="display:flex;flex-direction:column;align-items:center"><span class="hv" style="font-size:14px">'+(VOICE.speaking?'🔊':'🎙️')+'</span><span>voz</span></div>':'');
+    '';
   if(BET>0){
     const slot=$('HUD_CHIP');
     if(slot){slot.appendChild(mkChip(BET,26));const lbl=document.createElement('span');lbl.style.cssText='font-size:8px;color:rgba(232,220,200,.5)';lbl.textContent='apuesta';slot.appendChild(lbl);}
@@ -3814,15 +3820,17 @@ function voiceCreatePeer(slotReal){
 // ── Iniciar conexiones como iniciador (mayor slot inicia) ──
 async function voiceConnect(slotReal){
   const pc=voiceCreatePeer(slotReal);
+  // los tracks ya se agregan en voiceCreatePeer si VOICE.stream existe
   try{
-    const offer=await pc.createOffer();
+    // offer con audio
+    const offer=await pc.createOffer({offerToReceiveAudio:true});
     await pc.setLocalDescription(offer);
     await voicePatch(d=>{
       if(!d.offers)d.offers=[];
-      // eliminar offer anterior del mismo par
       d.offers=d.offers.filter(o=>!(o.from===VOICE.mySlotReal&&o.to===slotReal));
       d.offers.push({from:VOICE.mySlotReal,to:slotReal,sdp:offer.sdp});
     });
+    console.log('[VOZ] Offer enviado a slot',slotReal);
   }catch(e){console.log('voiceConnect error:',e);}
 }
 
@@ -3842,12 +3850,21 @@ async function voicePoll(){
     }
     try{
       await pc.setRemoteDescription({type:'offer',sdp:o.sdp});
+      // agregar tracks locales si aún no están
+      if(VOICE.stream){
+        const senders=pc.getSenders();
+        VOICE.stream.getTracks().forEach(t=>{
+          if(!senders.find(s=>s.track===t))
+            try{pc.addTrack(t,VOICE.stream);}catch(e3){}
+        });
+      }
       // aplicar ICE pendientes
       for(const ic of(VOICE.pendingIce[o.from]||[])){
         try{await pc.addIceCandidate(new RTCIceCandidate(ic));}catch(e2){}
       }
       VOICE.pendingIce[o.from]=[];
       const answer=await pc.createAnswer();
+      console.log('[VOZ] Answer enviado a slot',o.from);
       await pc.setLocalDescription(answer);
       await voicePatch(d=>{
         if(!d.answers)d.answers=[];
@@ -3932,18 +3949,21 @@ async function voiceToggle(){
         });
       });
       voiceStartDetection();
-      // iniciar conexiones con jugadores de mayor slot
-      const np=S.np||2;
-      for(let s=0;s<np;s++){
-        if(s===VOICE.mySlotReal)continue;
-        // el de mayor slot inicia la conexión
-        if(VOICE.mySlotReal>s)voiceConnect(s);
-      }
-      // limpiar señalización anterior
+      // limpiar señalización anterior PRIMERO
       await voiceSet({offers:[],answers:[],ice:[],ts:Date.now()});
       // iniciar polling de voz
       VOICE.pollInterval=setInterval(voicePoll,VOICE_POLL_MS);
       redraw();
+      // pequeño delay para que el otro jugador también active antes de enviar offer
+      setTimeout(()=>{
+        if(!VOICE.enabled)return;
+        const np=S.np||2;
+        for(let s=0;s<np;s++){
+          if(s===VOICE.mySlotReal)continue;
+          // el de mayor slot inicia la conexión
+          if(VOICE.mySlotReal>s)voiceConnect(s);
+        }
+      },1500);
     }catch(e){
       alert('No se pudo acceder al micrófono. Verificá los permisos.');
       VOICE.enabled=false;
