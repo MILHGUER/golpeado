@@ -3675,11 +3675,22 @@ function voiceCreatePeer(slotReal){
 
   // recibir audio remoto
   pc.ontrack=e=>{
-    const audio=new Audio();
+    // adjuntar al DOM para que funcione en iOS Safari
+    const audioId='voice_audio_'+slotReal;
+    let audio=document.getElementById(audioId);
+    if(!audio){
+      audio=document.createElement('audio');
+      audio.id=audioId;
+      audio.autoplay=true;
+      audio.setAttribute('playsinline','');
+      audio.style.display='none';
+      document.body.appendChild(audio);
+    }
     audio.srcObject=e.streams[0];
-    audio.autoplay=true;
-    audio.setAttribute('playsinline','');
-    // detectar si este peer está hablando
+    // intentar reproducir (necesario en iOS)
+    audio.play().catch(()=>{});
+
+    // detectar volumen para indicador visual
     try{
       const actx=new(window.AudioContext||window.webkitAudioContext)();
       const src=actx.createMediaStreamSource(e.streams[0]);
@@ -3687,15 +3698,25 @@ function voiceCreatePeer(slotReal){
       an.fftSize=512;
       src.connect(an);
       const buf=new Uint8Array(an.frequencyBinCount);
+      let lastSpeaking=false;
       const detect=()=>{
+        if(!VOICE.peers[slotReal]){
+          VOICE.speakingPeers[slotReal]=false;
+          return;
+        }
         an.getByteFrequencyData(buf);
         const vol=buf.reduce((a,b)=>a+b,0)/buf.length;
-        VOICE.speakingPeers[slotReal]=(vol>8);
-        redraw();
-        if(VOICE.peers[slotReal])requestAnimationFrame(detect);
+        const isSpeaking=(vol>8);
+        VOICE.speakingPeers[slotReal]=isSpeaking;
+        // solo redibujar cuando cambia el estado
+        if(isSpeaking!==lastSpeaking){
+          lastSpeaking=isSpeaking;
+          redraw();
+        }
+        requestAnimationFrame(detect);
       };
       detect();
-    }catch(e2){}
+    }catch(e2){console.log('voice detect error:',e2);}
   };
 
   // ICE candidates
@@ -3871,6 +3892,10 @@ function voiceStop(){
   Object.values(VOICE.peers).forEach(pc=>{try{pc.close();}catch(e){}});
   VOICE.peers={};
   VOICE.pendingIce={};
+  // limpiar elementos de audio del DOM
+  document.querySelectorAll('[id^="voice_audio_"]').forEach(a=>{
+    try{a.srcObject=null;a.remove();}catch(e){}
+  });
   redraw();
 }
 
