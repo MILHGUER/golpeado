@@ -3901,9 +3901,21 @@ function getVoiceIndicator(slotLocal){
   // slotLocal 0 = yo, 1+ = otros (rotados)
   // convertir slot local a slot real
   const slotReal=(slotLocal+MP.mySlot)%S.np;
-  if(slotLocal===0&&VOICE.speaking)return '🔊';
-  if(slotLocal>0&&VOICE.speakingPeers[slotReal])return '🔊';
-  if(VOICE.enabled&&slotLocal===0)return '🎙️';
+
+  if(slotLocal===0){
+    // mi propio indicador
+    if(!VOICE.enabled)return '';
+    return VOICE.speaking?'🔊':'🎙️';
+  }
+
+  // indicador de otro jugador
+  const isSpeaking=VOICE.speakingPeers[slotReal];
+  const isConnected=VOICE.peers[slotReal]&&
+    (VOICE.peers[slotReal].connectionState==='connected'||
+     VOICE.peers[slotReal].connectionState==='completed');
+
+  if(isSpeaking)return '🔊';
+  if(isConnected)return '🎙️'; // conectado pero en silencio
   return '';
 }
 
