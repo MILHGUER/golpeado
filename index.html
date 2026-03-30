@@ -109,7 +109,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
   #HTP_OV div[style*="font-size:12px"]{font-size:15px !important}
   #HTP_OV div[style*="font-size:13px"]{font-size:16px !important}
   #HTP_OV div[style*="font-size:10px"]{font-size:12px !important}
-  #HTP_OV button[id^="HTP_TAB"]{font-size:12px !important;padding:10px 16px !important}
+  #HTP_OV button[id^="HTP_TAB"]{font-size:11px !important;padding:10px 8px !important}
   #HTP_OV #HTP_OK{font-size:15px !important;padding:14px !important}
 }
 /* SHUFFLE */
@@ -2461,11 +2461,11 @@ function showHowToPlay(onClose){
   ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;z-index:900;padding:0;overflow:hidden';
 
   const tabs=[
-    {id:'obj',label:'🎯 Objetivo'},
-    {id:'tur',label:'🔄 Turno'},
-    {id:'com',label:'🃏 Combos'},
-    {id:'gol',label:'👊 GOLPEADO'},
-    {id:'pen',label:'⚠️ Penalizaciones'},
+    {id:'obj',label:'🎯 Objetivo',short:'🎯'},
+    {id:'tur',label:'🔄 Turno',short:'🔄'},
+    {id:'com',label:'🃏 Combos',short:'🃏'},
+    {id:'gol',label:'👊 GOLPEADO',short:'👊'},
+    {id:'pen',label:'⚠️ Penaliz.',short:'⚠️'},
   ];
 
   const contenido={
@@ -2579,11 +2579,8 @@ function showHowToPlay(onClose){
         <div style="padding:18px 20px 10px;border-bottom:1px solid rgba(201,168,76,.15)">
           <div style="font-family:Cinzel,serif;font-size:clamp(16px,2.5vw,22px);color:var(--gold);text-align:center;letter-spacing:.08em">🃏 Cómo se juega</div>
         </div>
-        <div style="display:flex;overflow-x:auto;gap:0;border-bottom:1px solid rgba(201,168,76,.15);flex-shrink:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory">
-          ${tabs.map(t=>`<button id="HTP_TAB_${t.id}" style="flex-shrink:0;padding:10px 14px;background:${tabActivo===t.id?'rgba(201,168,76,.12)':'transparent'};border:none;border-bottom:3px solid ${tabActivo===t.id?'var(--gold)':'transparent'};color:${tabActivo===t.id?'var(--gold)':'rgba(232,220,200,.5)'};font-family:Cinzel,serif;font-size:11px;cursor:pointer;white-space:nowrap;touch-action:manipulation;scroll-snap-align:start;min-width:fit-content">${t.label}</button>`).join('')}
-        </div>
-        <div style="display:flex;justify-content:center;gap:4px;padding:4px 0;flex-shrink:0">
-          ${tabs.map(t=>`<div style="width:${tabActivo===t.id?'16px':'6px'};height:4px;border-radius:2px;background:${tabActivo===t.id?'var(--gold)':'rgba(232,220,200,.2)'};transition:all .2s"></div>`).join('')}
+        <div style="display:flex;gap:0;border-bottom:1px solid rgba(201,168,76,.15);flex-shrink:0">
+          ${tabs.map(t=>`<button id="HTP_TAB_${t.id}" style="flex:1;padding:8px 4px;background:${tabActivo===t.id?'rgba(201,168,76,.12)':'transparent'};border:none;border-bottom:3px solid ${tabActivo===t.id?'var(--gold)':'transparent'};color:${tabActivo===t.id?'var(--gold)':'rgba(232,220,200,.5)'};font-family:Cinzel,serif;font-size:9px;cursor:pointer;white-space:nowrap;touch-action:manipulation;text-align:center;display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font-size:15px">${t.short}</span><span style="font-size:8px;opacity:.8">${t.id==='obj'?'Objetivo':t.id==='tur'?'Turno':t.id==='com'?'Combos':t.id==='gol'?'Golpeado':'Penaliz.'}</span></button>`).join('')}
         </div>
         <div style="flex:1;overflow-y:auto;padding:clamp(16px,3vw,28px) clamp(20px,4vw,40px)">
           ${contenido[tabActivo]}
