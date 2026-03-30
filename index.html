@@ -1747,11 +1747,10 @@ function nuevaPartida(){
   rmEl('OV');
   if(MP.mode==='multi'){
     // en multi: volver al lobby de la misma sala para jugar otra partida
-    voiceStop(); // detener voz al volver al lobby
+    voiceStop(true); // detener voz al volver al lobby (sin publicar estado)
     stopPoll();
     // ── LIMPIAR estado del juego anterior completamente ──
     Object.assign(S,{deck:[],disc:[],hands:Array.from({length:S.np},()=>[]),shown:Array.from({length:S.np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null});
-    redraw(); // limpiar el tablero visualmente antes de mostrar lobby
     MP.mySlot=MP.isHost?0:MP.mySlot; // mantener slot
     // publicar estado de lobby para que todos vean la sala de espera
     const lobbyState={
@@ -1762,6 +1761,7 @@ function nuevaPartida(){
       gameState:null,ts:Date.now()
     };
     sbSet(MP.salaId,lobbyState).then(()=>{
+      rmEl('OV');rmEl('SHUF');rmEl('PNLT_OV');rmEl('CONFIRM_LISTO');rmEl('CUE_OV');
       suscribirSala(()=>buildLobbyUI(lobbyState,MP.isHost));
     }).catch(()=>{
       rmEl('MODE_OV');showModeScreen();
@@ -4025,12 +4025,12 @@ async function voiceToggle(){
 }
 
 // ── Detener todo ──
-function voiceStop(){
+function voiceStop(skipPublish){
   VOICE.enabled=false;
   VOICE.speaking=false;
   VOICE.speakingPeers={};
-  // publicar que ya no tengo voz activa
-  if(S._voiceActive&&MP.mySlot>=0){
+  // publicar que ya no tengo voz activa (solo si no estamos cambiando de partida)
+  if(!skipPublish&&S._voiceActive&&MP.mySlot>=0){
     S._voiceActive[MP.mySlot]=false;
     if(MP.mode==='multi')setTimeout(()=>mpPublicarEstado(),200);
   }
