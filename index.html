@@ -67,7 +67,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 @media(min-width:900px){.card{grid-template-rows:20px 1fr 20px}}
 @media(min-width:1200px){.card{grid-template-rows:22px 1fr 22px}}
 .card.draggable{touch-action:pan-y}
-.card.red{color:#C0392B}.card.blk{color:#111111}.card.green{color:#1a6e1a}.card.orange{color:#1E90FF}
+.card.red{color:#C0392B;-webkit-text-fill-color:#C0392B}.card.blk{color:#111111;-webkit-text-fill-color:#111111}.card.green{color:#1a6e1a;-webkit-text-fill-color:#1a6e1a}.card.orange{color:#1E90FF;-webkit-text-fill-color:#1E90FF}
 .card.jkcard{background:linear-gradient(135deg,#2a0a4a,#1a0a3a);border-color:#7B5AAA;border-width:1.5px}
 .card.wlcard{background:linear-gradient(135deg,#0a2535,#0a1f2e);border-color:#1a7a8a;border-width:1.5px}
 .card.sel{transform:translateY(-10px);box-shadow:0 0 0 2px var(--gold),0 8px 18px rgba(0,0,0,.45)}
@@ -662,7 +662,7 @@ let BANK=null; // se inicializa lazy cuando se necesita
 let _revTimer=null;      // timeout del temporizador de revelación
 let _revTimerSec=0;      // segundos restantes
 let _revTimerInterval=null; // interval del contador
-const REV_TIMEOUT=120;   // segundos por turno de revelación
+const REV_TIMEOUT=180;   // segundos por turno de revelación
 
 function startRevTimer(){
   clearRevTimer();
@@ -1796,9 +1796,10 @@ function mkFace(c,selectable){
   // color de palo para las esquinas — diferencia trébol(verde) de pica(negro)
   const suitColor=c.h||'#111';
   const suitStyle=`color:${suitColor}`;
-  const t=document.createElement('div');t.className='cn';t.innerHTML=`<span class="cnn" style="${suitStyle}">${L}</span><span class="cns" style="${suitStyle}">${c.s}</span>`;e.appendChild(t);
+  const _ss=`color:${suitColor};-webkit-text-fill-color:${suitColor}`;
+  const t=document.createElement('div');t.className='cn';t.innerHTML=`<span class="cnn" style="${_ss}">${L}</span><span class="cns" style="${_ss}">${c.s}</span>`;e.appendChild(t);
   const cc=document.createElement('div');cc.className='cc';cc.innerHTML=cardInner(c);e.appendChild(cc);
-  const b=document.createElement('div');b.className='cn b';b.innerHTML=`<span class="cnn" style="${suitStyle}">${L}</span><span class="cns" style="${suitStyle}">${c.s}</span>`;e.appendChild(b);
+  const b=document.createElement('div');b.className='cn b';b.innerHTML=`<span class="cnn" style="${_ss}">${L}</span><span class="cns" style="${_ss}">${c.s}</span>`;e.appendChild(b);
   if(selectable){
     e.classList.add('draggable'); // permite drag sin interferir con scroll
     e.addEventListener('click',()=>actToggle(c.id));
@@ -2546,7 +2547,7 @@ function showHowToPlay(onClose){
       </div>
       <div style="background:rgba(232,155,0,.08);border:1px solid rgba(232,155,0,.3);border-radius:8px;padding:10px 12px">
         <div style="color:#E8A84C;font-size:12px;font-weight:700;margin-bottom:4px">⏱ TIEMPO LÍMITE — 120 SEGUNDOS</div>
-        <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Cada jugador tiene <strong style="color:#E8A84C">120 segundos</strong> para mostrar sus combos y encajar. Una barra de tiempo visible cuenta regresivamente. Si se acaba el tiempo, se registran automáticamente las cartas que quedaron en mano como sobrantes y pasa el turno al siguiente.</div>
+        <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Cada jugador tiene <strong style="color:#E8A84C">180 segundos</strong> para mostrar sus combos y encajar. Una barra de tiempo visible cuenta regresivamente. Si se acaba el tiempo, se registran automáticamente las cartas que quedaron en mano como sobrantes y pasa el turno al siguiente.</div>
       </div>
     </div>`,
 
@@ -2562,7 +2563,7 @@ function showHowToPlay(onClose){
       </div>
       <div style="background:rgba(232,155,0,.08);border:1px solid rgba(232,155,0,.3);border-radius:8px;padding:10px 12px">
         <div style="color:#E8A84C;font-size:12px;font-weight:700;margin-bottom:4px">⏱ TIEMPO AGOTADO</div>
-        <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Si un jugador no presiona Listo dentro de los <strong style="color:#E8A84C">120 segundos</strong>, sus cartas restantes se registran automáticamente como sobrantes y el turno pasa al siguiente jugador.</div>
+        <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Si un jugador no presiona Listo dentro de los <strong style="color:#E8A84C">180 segundos</strong>, sus cartas restantes se registran automáticamente como sobrantes y el turno pasa al siguiente jugador.</div>
       </div>
       <div style="background:rgba(232,220,200,.05);border:1px solid rgba(232,220,200,.15);border-radius:8px;padding:10px 12px">
         <div style="color:rgba(232,220,200,.7);font-size:12px;font-weight:700;margin-bottom:4px">EMPATE</div>
