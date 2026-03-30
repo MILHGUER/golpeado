@@ -67,7 +67,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 @media(min-width:900px){.card{grid-template-rows:20px 1fr 20px}}
 @media(min-width:1200px){.card{grid-template-rows:22px 1fr 22px}}
 .card.draggable{touch-action:pan-y}
-.card.red{color:#C0392B;-webkit-text-fill-color:#C0392B}.card.blk{color:#111111;-webkit-text-fill-color:#111111}.card.green{color:#1a6e1a;-webkit-text-fill-color:#1a6e1a}.card.orange{color:#1E90FF;-webkit-text-fill-color:#1E90FF}
+.card.red{color:#C0392B}.card.blk{color:#111111}.card.green{color:#1a6e1a}.card.orange{color:#1E90FF}
 .card.jkcard{background:linear-gradient(135deg,#2a0a4a,#1a0a3a);border-color:#7B5AAA;border-width:1.5px}
 .card.wlcard{background:linear-gradient(135deg,#0a2535,#0a1f2e);border-color:#1a7a8a;border-width:1.5px}
 .card.sel{transform:translateY(-10px);box-shadow:0 0 0 2px var(--gold),0 8px 18px rgba(0,0,0,.45)}
@@ -789,17 +789,20 @@ async function showCuentas(){
   $('G').appendChild(ov);
 
   // en multi: cargar banco actualizado desde Supabase
-  if(MP.mode==='multi'&&MP.salaId){
+  const cuentasSalaId=MP.salaId||MP._lastSalaId||'';
+  if(MP.mode==='multi'&&cuentasSalaId){
     await loadBankFromSupabase();
+  } else if(MP.mode!=='multi'){
+    // modo local, no necesita cargar
   }
 
   // obtener banco y nombres
+  const np=MP.mode==='multi'?(MP._jugadores||[{},{},{}]).length:3;
   const bankData=loadBank();
   const bankMatrix=MP.mode==='multi'?(bankData.matrix||Array.from({length:np},()=>Array(np).fill(0))):bankData;
   // nombres guardados en el banco (para cuando se mira después de la partida)
   const savedNames=(MP.mode==='multi'&&bankData.names&&bankData.names.length)?bankData.names:null;
   const getName=(i)=>savedNames?savedNames[i]:(PNAME(i));
-  const np=MP.mode==='multi'?(MP._jugadores||[{},{},{}]).length:3;
 
   const balances=[];
   for(let i=0;i<np;i++){
@@ -1836,9 +1839,22 @@ function mkFace(c,selectable){
   const suitColor=c.h||'#111';
   const suitStyle=`color:${suitColor}`;
   const _ss=`color:${suitColor};-webkit-text-fill-color:${suitColor}`;
-  const t=document.createElement('div');t.className='cn';t.innerHTML=`<span class="cnn" style="${_ss}">${L}</span><span class="cns" style="${_ss}">${c.s}</span>`;e.appendChild(t);
+  const t=document.createElement('div');t.className='cn';
+  const tNum=document.createElement('span');tNum.className='cnn';tNum.textContent=L;
+  const tSuit=document.createElement('span');tSuit.className='cns';tSuit.textContent=c.s;
+  t.appendChild(tNum);t.appendChild(tSuit);
+  e.appendChild(t);
   const cc=document.createElement('div');cc.className='cc';cc.innerHTML=cardInner(c);e.appendChild(cc);
-  const b=document.createElement('div');b.className='cn b';b.innerHTML=`<span class="cnn" style="${_ss}">${L}</span><span class="cns" style="${_ss}">${c.s}</span>`;e.appendChild(b);
+  const b=document.createElement('div');b.className='cn b';
+  const bNum=document.createElement('span');bNum.className='cnn';bNum.textContent=L;
+  const bSuit=document.createElement('span');bSuit.className='cns';bSuit.textContent=c.s;
+  b.appendChild(bNum);b.appendChild(bSuit);
+  e.appendChild(b);
+  // Aplicar colores con setProperty para que funcione en iOS Safari
+  [tNum,tSuit,bNum,bSuit].forEach(el=>{
+    el.style.setProperty('color',suitColor,'important');
+    el.style.setProperty('-webkit-text-fill-color',suitColor,'important');
+  });
   if(selectable){
     e.classList.add('draggable'); // permite drag sin interferir con scroll
     e.addEventListener('click',()=>actToggle(c.id));
@@ -2709,6 +2725,7 @@ function showModeScreen(){
   const urlSala=getSalaParam();
   if(urlSala){
     MP.salaId=urlSala;
+    MP._lastSalaId=urlSala;
     MP.isHost=false;
     checkFirstVisit(()=>showNombreScreen('unir'));
     return;
@@ -2799,6 +2816,7 @@ function showNombreScreen(accion){
     try{localStorage.setItem('golpeado_nombre',nombre);}catch(e){}
     if(accion==='crear'){
       MP.salaId=genId(6);
+      MP._lastSalaId=MP.salaId;
       MP.isHost=true;
       rmEl('NOM_OV');
       crearSala();
@@ -2808,6 +2826,7 @@ function showNombreScreen(accion){
       const codigo=vienePorEnlace?urlSala:(salaInput?.value||'').trim().toUpperCase();
       if(!codigo){err.textContent='Ingresá el código de sala.';return;}
       MP.salaId=codigo;
+      MP._lastSalaId=codigo;
       MP.isHost=false;
       rmEl('NOM_OV');
       unirseASala();
@@ -3570,6 +3589,7 @@ function aplicarEstadoRemoto(estado){
   S._revSel=new Set(estado._revSel||[]);
   S._fitTarget=estado._fitTarget||null;
   S._fitCandidates=estado._fitCandidates?new Set(estado._fitCandidates):null;
+  S._voiceActive=estado._voiceActive||{};
   BET=estado.apuesta||0;
 
   redraw();
@@ -3631,6 +3651,7 @@ async function mpPublicarEstado(){
     const estado={
       // usar fase correcta para que handleEstadoRemoto lo enrute bien
       fase:S.phase==='mesa_final'?'mesa_final':(S.phase==='golpeado_reveal'?'golpeado_reveal':'jugando'),
+      _voiceActive:S._voiceActive||{},
       np,
       jugadores:MP._jugadores||[],
       apuesta:BET,
@@ -3717,6 +3738,10 @@ const VOICE_POLL_MS=500;
 const ICE_SERVERS=[
   {urls:'stun:stun.l.google.com:19302'},
   {urls:'stun:stun1.l.google.com:19302'},
+  {urls:'stun:stun2.l.google.com:19302'},
+  {urls:'stun:stun3.l.google.com:19302'},
+  {urls:'stun:stun4.l.google.com:19302'},
+  {urls:'stun:openrelay.metered.ca:80'},
 ];
 
 // ── Leer/escribir señalización en Supabase ──
@@ -3765,8 +3790,15 @@ function voiceCreatePeer(slotReal){
       document.body.appendChild(audio);
     }
     audio.srcObject=e.streams[0];
-    // intentar reproducir (necesario en iOS)
-    audio.play().catch(()=>{});
+    // forzar reproducción en iOS Safari
+    audio.play().catch(err=>{
+      console.log('[VOZ] audio.play() bloqueado:',err);
+      // iOS requiere interacción del usuario — escuchar primer click
+      const unblock=()=>{audio.play().catch(()=>{});document.removeEventListener('click',unblock);document.removeEventListener('touchend',unblock);};
+      document.addEventListener('click',unblock,{once:true});
+      document.addEventListener('touchend',unblock,{once:true});
+    });
+    console.log('[VOZ] 🔊 Track recibido de slot',slotReal);
 
     // detectar volumen para indicador visual
     try{
@@ -3807,7 +3839,22 @@ function voiceCreatePeer(slotReal){
   };
 
   pc.onconnectionstatechange=()=>{
-    if(pc.connectionState==='failed'||pc.connectionState==='disconnected'){
+    console.log('[VOZ] peer',slotReal,'state:',pc.connectionState);
+    if(pc.connectionState==='connected'){
+      console.log('[VOZ] ✅ Conectado con slot',slotReal);
+      redraw();
+    }
+    if(pc.connectionState==='failed'){
+      console.log('[VOZ] ❌ Falló conexión con slot',slotReal,'— reintentando...');
+      delete VOICE.peers[slotReal];
+      delete VOICE.speakingPeers[slotReal];
+      redraw();
+      // reintentar conexión si soy el iniciador
+      if(VOICE.enabled&&VOICE.mySlotReal>slotReal){
+        setTimeout(()=>{if(VOICE.enabled)voiceConnect(slotReal);},2000);
+      }
+    }
+    if(pc.connectionState==='disconnected'){
       delete VOICE.peers[slotReal];
       delete VOICE.speakingPeers[slotReal];
       redraw();
@@ -3942,6 +3989,10 @@ async function voiceToggle(){
       VOICE.stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
       VOICE.enabled=true;
       VOICE.mySlotReal=MP.mySlot;
+      // publicar que tengo voz activa para que los otros lo vean
+      if(!S._voiceActive)S._voiceActive={};
+      S._voiceActive[MP.mySlot]=true;
+      if(MP.mode==='multi')setTimeout(()=>mpPublicarEstado(),200);
       // agregar tracks a peers existentes
       Object.values(VOICE.peers).forEach(pc=>{
         VOICE.stream.getTracks().forEach(t=>{
@@ -3978,6 +4029,11 @@ function voiceStop(){
   VOICE.enabled=false;
   VOICE.speaking=false;
   VOICE.speakingPeers={};
+  // publicar que ya no tengo voz activa
+  if(S._voiceActive&&MP.mySlot>=0){
+    S._voiceActive[MP.mySlot]=false;
+    if(MP.mode==='multi')setTimeout(()=>mpPublicarEstado(),200);
+  }
   if(VOICE.pollInterval){clearInterval(VOICE.pollInterval);VOICE.pollInterval=null;}
   if(VOICE.stream){VOICE.stream.getTracks().forEach(t=>t.stop());VOICE.stream=null;}
   if(VOICE.audioCtx){try{VOICE.audioCtx.close();}catch(e){}VOICE.audioCtx=null;}
@@ -4027,12 +4083,13 @@ function getVoiceIndicator(slotLocal){
 
   // indicador de otro jugador
   const isSpeaking=VOICE.speakingPeers[slotReal];
-  const isConnected=VOICE.peers[slotReal]&&
-    (VOICE.peers[slotReal].connectionState==='connected'||
-     VOICE.peers[slotReal].connectionState==='completed');
+  const peer=VOICE.peers[slotReal];
+  const isActive=peer&&peer.connectionState!=='failed'&&peer.connectionState!=='closed';
+  // también mostrar si hay estado de voz publicado en el estado remoto
+  const hasRemoteVoice=S._voiceActive&&S._voiceActive[slotReal];
 
   if(isSpeaking)return '🔊';
-  if(isConnected)return '🎙️'; // conectado pero en silencio
+  if(isActive||hasRemoteVoice)return '🎙️';
   return '';
 }
 
