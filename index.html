@@ -3088,6 +3088,7 @@ function buildLobbyUI(estado,isHost){
 
   $('G').appendChild(ov);
   actualizarLobbyUI(estado);
+  drawVoiceUI(); // mostrar botón de micrófono en lobby
 
   // botones cómo jugar y cuentas en lobby
   const htpBtn=ov.querySelector('#LB_HTP');
@@ -3875,17 +3876,19 @@ function voiceStop(){
 
 // ── Dibujar botón de voz e indicadores ──
 function drawVoiceUI(){
-  // botón flotante 🎙️ solo en partida multi activa
+  // botón flotante 🎙️ disponible en multi cuando hay sala
   rmEl('VOICE_BTN');
-  if(MP.mode!=='multi'||S.phase==='lobby'||S.phase==='shuffle'||S.phase==='dealing')return;
+  if(MP.mode!=='multi'||!MP.salaId)return;
+  // no mostrar durante animaciones de barajado/repartición
+  if(S.phase==='shuffle'||S.phase==='dealing')return;
 
   const btn=document.createElement('button');
   btn.id='VOICE_BTN';
   const isSpeaking=VOICE.speaking;
   const color=VOICE.enabled?(isSpeaking?'#7be87b':'#C9A84C'):'rgba(232,220,200,.35)';
   const bg=VOICE.enabled?'rgba(0,0,0,.75)':'rgba(0,0,0,.5)';
-  const icon=VOICE.enabled?(isSpeaking?'🔊':'🎙️'):'🔇';
-  btn.style.cssText=`position:absolute;bottom:70px;right:8px;z-index:300;width:38px;height:38px;border-radius:50%;border:2px solid ${color};background:${bg};font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:border-color .2s;box-shadow:${isSpeaking?'0 0 10px rgba(123,232,123,.6)':'none'}`;
+  const icon=VOICE.enabled?(isSpeaking?'🔊':'🎙️'):'🎙️';
+  btn.style.cssText=`position:absolute;bottom:70px;right:8px;z-index:850;width:38px;height:38px;border-radius:50%;border:2px solid ${color};background:${bg};font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:border-color .2s;box-shadow:${isSpeaking?'0 0 10px rgba(123,232,123,.6)':'none'}`;
   btn.textContent=icon;
   btn.title=VOICE.enabled?'Desactivar micrófono':'Activar micrófono';
   btn.addEventListener('click',voiceToggle);
