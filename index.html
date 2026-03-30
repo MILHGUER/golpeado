@@ -1705,6 +1705,7 @@ function nuevaPartida(){
   rmEl('OV');
   if(MP.mode==='multi'){
     // en multi: volver al lobby de la misma sala para jugar otra partida
+    voiceStop(); // detener voz al volver al lobby
     stopPoll();
     // ── LIMPIAR estado del juego anterior completamente ──
     Object.assign(S,{deck:[],disc:[],hands:Array.from({length:S.np},()=>[]),shown:Array.from({length:S.np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null});
@@ -1783,7 +1784,7 @@ function showConfirmListo(pts){
 }
 
 // RENDER
-function redraw(){drawBots();drawCenter();drawHand();drawHUD();drawActs();}
+function redraw(){drawBots();drawCenter();drawHand();drawHUD();drawActs();drawVoiceUI();}
 
 function mkBack(){const e=document.createElement('div');e.className='card back';e.innerHTML='<div style="grid-row:1/-1;overflow:hidden"><div class="cbk" style="height:100%"></div></div>';return e;}
 
@@ -1919,7 +1920,8 @@ function drawBots(){
     const nm=document.createElement('div');nm.className='bname';
     nm.style.cssText='display:flex;align-items:center;gap:4px';
     const nameSpan=document.createElement('span');
-    nameSpan.innerHTML=`${active?'<span class="adot"></span>':''}${revealing?'<span class="adot"></span>':''}<span style="color:${PCOLOR[i]}">${PNAME(i)}</span>`;
+    const voiceInd=getVoiceIndicator(i);
+    nameSpan.innerHTML=`${active?'<span class="adot"></span>':''}${revealing?'<span class="adot"></span>':''}<span style="color:${PCOLOR[i]}">${PNAME(i)}</span>${voiceInd?`<span style="font-size:11px;margin-left:2px">${voiceInd}</span>`:''}`;
     nm.appendChild(nameSpan);
     if(BET>0)nm.appendChild(mkChip(BET,22));
     d.appendChild(nm);
@@ -2174,7 +2176,8 @@ function drawHUD(){
     '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv">'+S.deck.length+'</span><span>mazo</span></div>'+
     '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv">'+S.shown[0].length+'</span><span>combos</span></div>'+
     chipHtml+
-    '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv" style="color:'+turnoColor+';font-size:'+fontSize+'">'+turnoNombre+'</span><span>turno</span></div>';
+    '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv" style="color:'+turnoColor+';font-size:'+fontSize+'">'+turnoNombre+'</span><span>turno</span></div>'+
+    (VOICE.enabled?'<div style="display:flex;flex-direction:column;align-items:center"><span class="hv" style="font-size:14px">'+(VOICE.speaking?'🔊':'🎙️')+'</span><span>voz</span></div>':'');
   if(BET>0){
     const slot=$('HUD_CHIP');
     if(slot){slot.appendChild(mkChip(BET,26));const lbl=document.createElement('span');lbl.style.cssText='font-size:8px;color:rgba(232,220,200,.5)';lbl.textContent='apuesta';slot.appendChild(lbl);}
@@ -3610,6 +3613,295 @@ function showError(msg){
     <div style="font-family:Cinzel,serif;font-size:14px;color:#E24B4A">${msg}</div>
     <button onclick="rmEl('ERR_OV');showModeScreen()" style="padding:10px 20px;border-radius:7px;border:1.5px solid var(--gold);background:transparent;color:var(--gold);font-family:Cinzel,serif;font-size:11px;cursor:pointer;touch-action:manipulation">← Volver</button>`;
   $('G').appendChild(ov);
+}
+
+
+
+// ══════════════════════════════════════════════════════
+// ── SISTEMA DE VOZ WebRTC ──
+// ══════════════════════════════════════════════════════
+
+const VOICE={
+  enabled:false,        // micrófono activado
+  stream:null,          // MediaStream local
+  peers:{},             // {slotReal: RTCPeerConnection}
+  audioCtx:null,        // AudioContext para detección de voz
+  analyser:null,        // AnalyserNode
+  speaking:false,       // estoy hablando ahora
+  speakingPeers:{},     // {slot: true/false} quién habla
+  pollInterval:null,    // polling de señalización
+  mySlotReal:-1,        // slot real (sin rotar)
+  pendingIce:{},        // ICE candidates acumulados antes de remoteDescription
+};
+
+const VOICE_POLL_MS=500;
+const ICE_SERVERS=[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'},
+];
+
+// ── Leer/escribir señalización en Supabase ──
+async function voiceGet(){
+  try{
+    const row=await sbGet('voice_'+MP.salaId);
+    return row&&row.estado||{offers:[],answers:[],ice:[]};
+  }catch(e){return {offers:[],answers:[],ice:[]};}
+}
+async function voiceSet(data){
+  try{await sbSet('voice_'+MP.salaId,data);}catch(e){}
+}
+async function voicePatch(fn){
+  const data=await voiceGet();
+  fn(data);
+  data.ts=Date.now();
+  await voiceSet(data);
+}
+
+// ── Crear RTCPeerConnection para un par ──
+function voiceCreatePeer(slotReal){
+  if(VOICE.peers[slotReal]){
+    VOICE.peers[slotReal].close();
+    delete VOICE.peers[slotReal];
+  }
+  const pc=new RTCPeerConnection({iceServers:ICE_SERVERS});
+  VOICE.peers[slotReal]=pc;
+  VOICE.pendingIce[slotReal]=[];
+
+  // agregar tracks locales
+  if(VOICE.stream){
+    VOICE.stream.getTracks().forEach(t=>pc.addTrack(t,VOICE.stream));
+  }
+
+  // recibir audio remoto
+  pc.ontrack=e=>{
+    const audio=new Audio();
+    audio.srcObject=e.streams[0];
+    audio.autoplay=true;
+    audio.setAttribute('playsinline','');
+    // detectar si este peer está hablando
+    try{
+      const actx=new(window.AudioContext||window.webkitAudioContext)();
+      const src=actx.createMediaStreamSource(e.streams[0]);
+      const an=actx.createAnalyser();
+      an.fftSize=512;
+      src.connect(an);
+      const buf=new Uint8Array(an.frequencyBinCount);
+      const detect=()=>{
+        an.getByteFrequencyData(buf);
+        const vol=buf.reduce((a,b)=>a+b,0)/buf.length;
+        VOICE.speakingPeers[slotReal]=(vol>8);
+        redraw();
+        if(VOICE.peers[slotReal])requestAnimationFrame(detect);
+      };
+      detect();
+    }catch(e2){}
+  };
+
+  // ICE candidates
+  pc.onicecandidate=async e=>{
+    if(!e.candidate)return;
+    await voicePatch(d=>{
+      if(!d.ice)d.ice=[];
+      d.ice.push({from:VOICE.mySlotReal,to:slotReal,c:e.candidate.toJSON()});
+    });
+  };
+
+  pc.onconnectionstatechange=()=>{
+    if(pc.connectionState==='failed'||pc.connectionState==='disconnected'){
+      delete VOICE.peers[slotReal];
+      delete VOICE.speakingPeers[slotReal];
+      redraw();
+    }
+  };
+
+  return pc;
+}
+
+// ── Iniciar conexiones como iniciador (mayor slot inicia) ──
+async function voiceConnect(slotReal){
+  const pc=voiceCreatePeer(slotReal);
+  try{
+    const offer=await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await voicePatch(d=>{
+      if(!d.offers)d.offers=[];
+      // eliminar offer anterior del mismo par
+      d.offers=d.offers.filter(o=>!(o.from===VOICE.mySlotReal&&o.to===slotReal));
+      d.offers.push({from:VOICE.mySlotReal,to:slotReal,sdp:offer.sdp});
+    });
+  }catch(e){console.log('voiceConnect error:',e);}
+}
+
+// ── Polling de señalización ──
+async function voicePoll(){
+  if(!VOICE.enabled||!MP.salaId)return;
+  const data=await voiceGet();
+  const me=VOICE.mySlotReal;
+
+  // procesar offers para mí
+  for(const o of(data.offers||[])){
+    if(o.to!==me)continue;
+    const pc=VOICE.peers[o.from]||voiceCreatePeer(o.from);
+    if(pc.signalingState==='stable'||pc.signalingState==='have-local-offer'){
+      // ignorar si ya tiene remote
+      if(pc.remoteDescription)continue;
+    }
+    try{
+      await pc.setRemoteDescription({type:'offer',sdp:o.sdp});
+      // aplicar ICE pendientes
+      for(const ic of(VOICE.pendingIce[o.from]||[])){
+        try{await pc.addIceCandidate(new RTCIceCandidate(ic));}catch(e2){}
+      }
+      VOICE.pendingIce[o.from]=[];
+      const answer=await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await voicePatch(d=>{
+        if(!d.answers)d.answers=[];
+        d.answers=d.answers.filter(a=>!(a.from===me&&a.to===o.from));
+        d.answers.push({from:me,to:o.from,sdp:answer.sdp});
+        // limpiar el offer procesado
+        d.offers=d.offers.filter(of=>!(of.from===o.from&&of.to===me));
+      });
+    }catch(e){console.log('offer error:',e);}
+  }
+
+  // procesar answers para mí
+  for(const a of(data.answers||[])){
+    if(a.to!==me)continue;
+    const pc=VOICE.peers[a.from];
+    if(!pc||pc.remoteDescription)continue;
+    try{
+      await pc.setRemoteDescription({type:'answer',sdp:a.sdp});
+      // aplicar ICE pendientes
+      for(const ic of(VOICE.pendingIce[a.from]||[])){
+        try{await pc.addIceCandidate(new RTCIceCandidate(ic));}catch(e2){}
+      }
+      VOICE.pendingIce[a.from]=[];
+      await voicePatch(d=>{
+        d.answers=d.answers.filter(an=>!(an.from===a.from&&an.to===me));
+      });
+    }catch(e){console.log('answer error:',e);}
+  }
+
+  // procesar ICE candidates para mí
+  const remaining=[];
+  for(const ic of(data.ice||[])){
+    if(ic.to!==me){remaining.push(ic);continue;}
+    const pc=VOICE.peers[ic.from];
+    if(pc&&pc.remoteDescription){
+      try{await pc.addIceCandidate(new RTCIceCandidate(ic.c));}catch(e){}
+    } else {
+      // guardar para cuando tengamos remoteDescription
+      if(!VOICE.pendingIce[ic.from])VOICE.pendingIce[ic.from]=[];
+      VOICE.pendingIce[ic.from].push(ic.c);
+      remaining.push(ic); // mantener hasta procesar
+    }
+  }
+}
+
+// ── Detección de voz local ──
+function voiceStartDetection(){
+  if(!VOICE.stream)return;
+  try{
+    VOICE.audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const src=VOICE.audioCtx.createMediaStreamSource(VOICE.stream);
+    VOICE.analyser=VOICE.audioCtx.createAnalyser();
+    VOICE.analyser.fftSize=512;
+    src.connect(VOICE.analyser);
+    const buf=new Uint8Array(VOICE.analyser.frequencyBinCount);
+    const detect=()=>{
+      if(!VOICE.enabled){VOICE.speaking=false;return;}
+      VOICE.analyser.getByteFrequencyData(buf);
+      const vol=buf.reduce((a,b)=>a+b,0)/buf.length;
+      const wasSpeaking=VOICE.speaking;
+      VOICE.speaking=(vol>10);
+      if(VOICE.speaking!==wasSpeaking)redraw();
+      requestAnimationFrame(detect);
+    };
+    detect();
+  }catch(e){}
+}
+
+// ── Activar/desactivar micrófono ──
+async function voiceToggle(){
+  if(!MP.salaId||MP.mode!=='multi'){return;}
+  if(!VOICE.enabled){
+    // activar
+    try{
+      VOICE.stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+      VOICE.enabled=true;
+      VOICE.mySlotReal=MP.mySlot;
+      // agregar tracks a peers existentes
+      Object.values(VOICE.peers).forEach(pc=>{
+        VOICE.stream.getTracks().forEach(t=>{
+          try{pc.addTrack(t,VOICE.stream);}catch(e){}
+        });
+      });
+      voiceStartDetection();
+      // iniciar conexiones con jugadores de mayor slot
+      const np=S.np||2;
+      for(let s=0;s<np;s++){
+        if(s===VOICE.mySlotReal)continue;
+        // el de mayor slot inicia la conexión
+        if(VOICE.mySlotReal>s)voiceConnect(s);
+      }
+      // limpiar señalización anterior
+      await voiceSet({offers:[],answers:[],ice:[],ts:Date.now()});
+      // iniciar polling de voz
+      VOICE.pollInterval=setInterval(voicePoll,VOICE_POLL_MS);
+      redraw();
+    }catch(e){
+      alert('No se pudo acceder al micrófono. Verificá los permisos.');
+      VOICE.enabled=false;
+    }
+  } else {
+    voiceStop();
+  }
+}
+
+// ── Detener todo ──
+function voiceStop(){
+  VOICE.enabled=false;
+  VOICE.speaking=false;
+  VOICE.speakingPeers={};
+  if(VOICE.pollInterval){clearInterval(VOICE.pollInterval);VOICE.pollInterval=null;}
+  if(VOICE.stream){VOICE.stream.getTracks().forEach(t=>t.stop());VOICE.stream=null;}
+  if(VOICE.audioCtx){try{VOICE.audioCtx.close();}catch(e){}VOICE.audioCtx=null;}
+  Object.values(VOICE.peers).forEach(pc=>{try{pc.close();}catch(e){}});
+  VOICE.peers={};
+  VOICE.pendingIce={};
+  redraw();
+}
+
+// ── Dibujar botón de voz e indicadores ──
+function drawVoiceUI(){
+  // botón flotante 🎙️ solo en partida multi activa
+  rmEl('VOICE_BTN');
+  if(MP.mode!=='multi'||S.phase==='lobby'||S.phase==='shuffle'||S.phase==='dealing')return;
+
+  const btn=document.createElement('button');
+  btn.id='VOICE_BTN';
+  const isSpeaking=VOICE.speaking;
+  const color=VOICE.enabled?(isSpeaking?'#7be87b':'#C9A84C'):'rgba(232,220,200,.35)';
+  const bg=VOICE.enabled?'rgba(0,0,0,.75)':'rgba(0,0,0,.5)';
+  const icon=VOICE.enabled?(isSpeaking?'🔊':'🎙️'):'🔇';
+  btn.style.cssText=`position:absolute;bottom:70px;right:8px;z-index:300;width:38px;height:38px;border-radius:50%;border:2px solid ${color};background:${bg};font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:border-color .2s;box-shadow:${isSpeaking?'0 0 10px rgba(123,232,123,.6)':'none'}`;
+  btn.textContent=icon;
+  btn.title=VOICE.enabled?'Desactivar micrófono':'Activar micrófono';
+  btn.addEventListener('click',voiceToggle);
+  btn.addEventListener('touchend',e=>{e.preventDefault();voiceToggle();},{passive:false});
+  $('G').appendChild(btn);
+}
+
+// ── Indicadores de voz en los bots/jugadores remotos ──
+function getVoiceIndicator(slotLocal){
+  // slotLocal 0 = yo, 1+ = otros (rotados)
+  // convertir slot local a slot real
+  const slotReal=(slotLocal+MP.mySlot)%S.np;
+  if(slotLocal===0&&VOICE.speaking)return '🔊';
+  if(slotLocal>0&&VOICE.speakingPeers[slotReal])return '🔊';
+  if(VOICE.enabled&&slotLocal===0)return '🎙️';
+  return '';
 }
 
 </script>
