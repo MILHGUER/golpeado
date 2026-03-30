@@ -381,7 +381,23 @@ function isRun(cs){
 
 function validCombo(cs){return cs.length>=3&&(isGroup(cs)||isRun(cs));}
 function comboType(cs){return isGroup(cs)?'grupo':'escalera';}
-function canFit(comboCards,c){return validCombo([...comboCards,c]);}
+function canFit(comboCards,c,combo){
+  // verificar primero que forma combo válido
+  if(!validCombo([...comboCards,c]))return false;
+  // si hay Joker en el combo y conocemos su posición, verificar que
+  // la carta no tenga el mismo valor que el Joker ya representa
+  if(combo&&comboCards.some(x=>x.jk)){
+    const jkVal=getJokerValue(combo);
+    if(jkVal>0){
+      // calcular el valor efectivo de la carta (A puede ser 1 o 14)
+      const nonJ=comboCards.filter(x=>!x.jk);
+      const hasKing=nonJ.some(x=>x.n===13);
+      const cardVal=(c.n===1&&hasKing)?14:c.n;
+      if(cardVal===jkVal)return false; // esa posición ya está ocupada por el Joker
+    }
+  }
+  return true;
+}
 function hasBothWilds(hand){return hand.some(c=>c.jk)&&hand.some(c=>c.wl);}
 // Detecta si un jugador usó ambos comodines (en mano O en combos bajados)
 function usedBothWilds(i){
@@ -515,6 +531,29 @@ function isJokerPosValid(orderedCards,jokerPos){
     return jv>=1;
   }
   return true;
+}
+
+// Devuelve el valor numérico que representa el Joker en un combo ordenado
+// Retorna -1 si no hay Joker o no se puede determinar
+function getJokerValue(combo){
+  const ord=combo.order||sortCombo(combo);
+  if(!ord)return -1;
+  const jokerIdx=ord.findIndex(c=>c.jk);
+  if(jokerIdx<0)return -1;
+  const nonJ=ord.filter(c=>!c.jk);
+  if(!nonJ.length)return -1;
+  const hasAce=nonJ.some(c=>c.n===1);
+  const hasKing=nonJ.some(c=>c.n===13);
+  const val=c=>(hasAce&&hasKing&&c.n===1)?14:c.n;
+  // vecino izquierdo
+  const leftCards=ord.slice(0,jokerIdx).filter(c=>!c.jk);
+  const rightCards=ord.slice(jokerIdx+1).filter(c=>!c.jk);
+  const left=leftCards[leftCards.length-1];
+  const right=rightCards[0];
+  if(left&&right)return val(left)+1;
+  if(left&&!right)return val(left)+1;
+  if(!left&&right)return val(right)-1;
+  return -1;
 }
 
 // intenta reubicar el Joker en nueva posición; si no es válida, muestra mensaje y no cambia
@@ -1580,7 +1619,7 @@ function autoFit(pid){
   while(ch){ch=false;
     for(let ci=0;ci<all.length&&!ch;ci++)
       for(let hi=0;hi<S.hands[pid].length&&!ch;hi++)
-        if(canFit(all[ci].cards,S.hands[pid][hi])){
+        if(canFit(all[ci].cards,S.hands[pid][hi],all[ci])){
           all[ci].cards.push(S.hands[pid][hi]);
           all[ci].order=null;
           S.hands[pid]=rmIds(S.hands[pid],[S.hands[pid][hi].id]);
@@ -1653,7 +1692,7 @@ function revealEncajar(){
 
   sel.forEach(card=>{
     // encontrar combos donde puede encajar
-    const fits=all.map((combo,ci)=>canFit(combo.cards,card)?ci:-1).filter(i=>i>=0);
+    const fits=all.map((combo,ci)=>canFit(combo.cards,card,combo)?ci:-1).filter(i=>i>=0);
     if(!fits.length)return;
     if(fits.length===1){
       // único destino → encajar directo
@@ -1692,7 +1731,7 @@ function fitToCombo(comboRef){
   if(!S._fitTarget)return;
   const card=S.hands[0].find(c=>c.id===S._fitTarget);
   if(!card){S._fitTarget=null;S._fitCandidates=null;redraw();return;}
-  if(!canFit(comboRef.cards,card)){
+  if(!canFit(comboRef.cards,card,comboRef)){
     S.msg='Ese combo no acepta esta carta.';
     S._fitTarget=null;S._fitCandidates=null;redraw();return;
   }
@@ -1747,7 +1786,7 @@ function revealListo(){
   const pts=S.hands[0].reduce((a,c)=>a+cv(c),0);
   if(pts>0){
     const hayCombo=(()=>{const hh=S.hands[0];for(let i=0;i<hh.length;i++)for(let j=i+1;j<hh.length;j++)for(let k=j+1;k<hh.length;k++)if(validCombo([hh[i],hh[j],hh[k]]))return true;return false;})();
-    const hayEncaje=S.hands[0].some(card=>S.shown.flat().some(combo=>canFit(combo.cards,card)));
+    const hayEncaje=S.hands[0].some(card=>S.shown.flat().some(combo=>canFit(combo.cards,card,combo)));
     if(hayCombo||hayEncaje){showConfirmListo(pts);return;}
   }
   doListo();
@@ -2216,7 +2255,7 @@ function drawActs(){
     const todosLosCombos=S.shown.flat();
     const hayEncaje=_hh.some(card=>todosLosCombos.some(combo=>{
       if(!combo||!combo.cards||!combo.cards.length)return false;
-      return canFit(combo.cards,card);
+      return canFit(combo.cards,card,combo);
     }));
     const hayMas=hayCombo||hayEncaje;
 
@@ -2328,6 +2367,31 @@ function showFinalOv(){
     </tr>`;
   }).join('');
 
+  // sección de penalizaciones explicadas
+  let penResumen='';
+  const penItems=[];
+  for(let i=0;i<S.np;i++){
+    const golpoSinGanar=gp===i&&!gWon;
+    const usaComodines=usedBothWilds(i);
+    if(golpoSinGanar)penItems.push({name:PNAME(i),color:PCOLOR[i],motivo:'Declaró GOLPEADO pero no ganó',icon:'👊'});
+    else if(usaComodines)penItems.push({name:PNAME(i),color:PCOLOR[i],motivo:'Usó los 2 comodines (★ Joker + ✦ Grupal)',icon:'⚠️'});
+  }
+  if(penItems.length){
+    penResumen=`<div style="width:100%;max-width:300px;border:1px solid rgba(226,75,74,.35);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:rgba(226,75,74,.07)">
+      <div style="font-family:Cinzel,serif;font-size:9px;color:#E24B4A;margin-bottom:8px;letter-spacing:.05em">⚠️ PENALIZACIONES</div>`;
+    penItems.forEach(p=>{
+      penResumen+=`<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;font-size:10px;padding-bottom:6px;border-bottom:1px solid rgba(226,75,74,.15)">
+        <span style="font-size:14px">${p.icon}</span>
+        <div>
+          <div style="color:${p.color};font-weight:700;margin-bottom:2px">${p.name}</div>
+          <div style="color:rgba(232,220,200,.7);font-size:9px">${p.motivo} — <strong style="color:#E24B4A">paga el doble</strong></div>
+        </div>
+      </div>`;
+    });
+    penResumen=penResumen.replace(/border-bottom:1px solid rgba\(226,75,74,\.15\)"><\/div>\s*$/, 'border-bottom:none"></div>');
+    penResumen+=`</div>`;
+  }
+
   // sección de pagos con fichas
   let payHtml='';
   if(BET>0&&!tie&&payments.length){
@@ -2353,7 +2417,7 @@ function showFinalOv(){
 
   ov.innerHTML=`<h2>${title}</h2><p>${note}</p>
     <table class="rtbl"><tr><th>Jugador</th><th>Pts</th><th>Sobrantes</th></tr>${rows}</table>
-    ${payHtml}
+    ${penResumen}${payHtml}
     <div style="display:flex;gap:8px;margin-top:6px;width:100%;max-width:280px">
       <button class="btn" onclick="showCuentas()" style="flex:1">💰 Ver cuentas</button>
       <button class="btn pri" onclick="nuevaPartida()" style="flex:2">Nueva partida</button>
