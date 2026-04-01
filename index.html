@@ -383,10 +383,23 @@ function isRun(cs){
 function validCombo(cs){return cs.length>=3&&(isGroup(cs)||isRun(cs));}
 function comboType(cs){return isGroup(cs)?'grupo':'escalera';}
 function canFit(comboCards,c,combo){
-  // Para grupos (mismo número): solo verificar que no esté ya el mismo palo
   const nonJ=comboCards.filter(x=>!x.jk&&!x.wl);
+
+  // ── Comodín grupal (✦) ──
+  // SOLO puede encajar en grupos (mismo número), nunca en escaleras
+  // No puede encajar si ya hay otro comodín grupal en el combo
+  if(c.wl){
+    if(!isGroup(comboCards))return false;          // solo en grupos
+    if(comboCards.some(x=>x.wl))return false;      // ya hay uno
+    return true;
+  }
+
+  // ── Joker (★) solo en escaleras, manejado más abajo ──
+
+  // Para grupos (mismo número): solo verificar que no esté ya el mismo palo
   if(isGroup(comboCards)){
     // grupo: la carta debe tener mismo número, palo distinto
+    if(c.jk)return false; // el Joker (★) no va en grupos
     const n=nonJ[0]&&nonJ[0].n;
     if(c.n!==n)return false;
     if(comboCards.some(x=>x.s===c.s))return false;
