@@ -416,32 +416,33 @@ function canFit(comboCards,c,combo){
     return card.n;
   };
 
-  const cardVal=(()=>{
-    if(aceAs14&&c.n===1)return 14;
-    return c.n;
-  })();
-
   // Obtener valor del extremo izquierdo y derecho del orden actual
   const leftCard=ord[0];
   const rightCard=ord[ord.length-1];
   const leftVal=effectiveVal(leftCard);
   const rightVal=effectiveVal(rightCard);
 
-  // La carta nueva debe ser contigua a uno de los dos extremos
-  const fitsLeft=(leftVal>0)&&(cardVal===leftVal-1);
-  const fitsRight=(rightVal>0)&&(cardVal===rightVal+1);
+  // El valor de la carta entrante puede ser múltiple:
+  // El As puede valer 1 (inicio) o 14 (final tras K), según dónde encaje
+  const cardVals=[];
+  if(c.n===1){
+    cardVals.push(1);   // A como inicio de escalera
+    cardVals.push(14);  // A como final de escalera (tras K o circular)
+  } else if(c.n>=2&&c.n<=5){
+    cardVals.push(c.n);        // valor normal
+    cardVals.push(c.n+13);     // valor circular extendido (2→15, etc.)
+  } else {
+    cardVals.push(c.n);
+  }
 
-  // Caso circular: si el extremo derecho es A(14) o bajo extendido,
-  // también permitir que 2/3 encaje (solo si no hay ya ese valor)
-  const fitsCircular=(()=>{
-    // Si el extremo derecho es A(14 o 1), permitir 2 al lado
-    if(rightVal===14&&cardVal===2)return true;
-    // Si el extremo izquierdo tiene un valor circular (15,16), el siguiente puede venir
-    if(leftVal>=15&&cardVal===leftVal-1)return true;
-    return false;
-  })();
+  // La carta nueva debe ser contigua a uno de los dos extremos con alguno de sus valores
+  let fits=false;
+  for(const cv of cardVals){
+    if(leftVal>0&&cv===leftVal-1){fits=true;break;}
+    if(rightVal>0&&cv===rightVal+1){fits=true;break;}
+  }
 
-  if(!fitsLeft&&!fitsRight&&!fitsCircular)return false;
+  if(!fits)return false;
 
   // Doble verificación: el combo resultante sigue siendo válido
   return validCombo([...comboCards,c]);
