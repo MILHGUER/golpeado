@@ -1260,18 +1260,24 @@ function calcPayments(winners,adj,tie,gp,gWon){
     bankMatrix=BANK;
   }
 
+  // convertir índice local a real (desrotar para que el host siempre guarde en índices reales)
+  const toReal=(localIdx)=>MP.mode==='multi'?(localIdx+MP.mySlot)%S.np:localIdx;
+
   for(let i=0;i<S.np;i++){
     if(i===winner)continue;
     const tieneComodines=usedBothWilds(i);
-    const golpoSinGanar=gp===i&&!gWon;
+    const golpoSinGanar=gp===i&&!gWon&&!tie;
     const esPenalizado=golpoSinGanar||tieneComodines;
     const monto=esPenalizado?BET*2:BET;
     const razon=golpoSinGanar?'golpeó sin ganar':tieneComodines?'2 comodines':'pierde';
     payments.push({from:i,to:winner,amount:monto,reason:razon});
     // solo el host (o modo solo) actualiza el banco para evitar duplicación
     if(MP.mode!=='multi'||MP.isHost){
-      if(!bankMatrix[i])bankMatrix[i]=Array(S.np).fill(0);
-      bankMatrix[i][winner]=(bankMatrix[i][winner]||0)+monto;
+      // usar índices reales para el banco
+      const realFrom=toReal(i);
+      const realTo=toReal(winner);
+      if(!bankMatrix[realFrom])bankMatrix[realFrom]=Array(S.np).fill(0);
+      bankMatrix[realFrom][realTo]=(bankMatrix[realFrom][realTo]||0)+monto;
     }
   }
   // solo guardar si es host o modo solo
@@ -4448,14 +4454,14 @@ const VOICE={
   pendingIce:{},        // ICE candidates acumulados antes de remoteDescription
 };
 
-const VOICE_POLL_MS=500;
+const VOICE_POLL_MS=800;
+// TURNO TURN servers gratuitos de Open Relay para NAT simétrico
 const ICE_SERVERS=[
   {urls:'stun:stun.l.google.com:19302'},
   {urls:'stun:stun1.l.google.com:19302'},
-  {urls:'stun:stun2.l.google.com:19302'},
-  {urls:'stun:stun3.l.google.com:19302'},
-  {urls:'stun:stun4.l.google.com:19302'},
-  {urls:'stun:openrelay.metered.ca:80'},
+  {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'},
 ];
 
 // ── Leer/escribir señalización en Supabase ──
@@ -4481,7 +4487,12 @@ function voiceCreatePeer(slotReal){
     VOICE.peers[slotReal].close();
     delete VOICE.peers[slotReal];
   }
-  const pc=new RTCPeerConnection({iceServers:ICE_SERVERS});
+  const pc=new RTCPeerConnection({
+    iceServers:ICE_SERVERS,
+    iceTransportPolicy:'all', // intentar directo primero, TURN como fallback
+    bundlePolicy:'max-bundle',
+    rtcpMuxPolicy:'require'
+  });
   VOICE.peers[slotReal]=pc;
   VOICE.pendingIce[slotReal]=[];
 
@@ -4500,7 +4511,11 @@ function voiceCreatePeer(slotReal){
       audio.id=audioId;
       audio.autoplay=true;
       audio.setAttribute('playsinline','');
-      audio.style.display='none';
+      audio.setAttribute('webkit-playsinline','');
+      audio.controls=false;
+      audio.muted=false;
+      audio.volume=1.0;
+      audio.style.cssText='position:absolute;width:1px;height:1px;opacity:0;pointer-events:none';
       document.body.appendChild(audio);
     }
     audio.srcObject=e.streams[0];
@@ -4583,8 +4598,8 @@ async function voiceConnect(slotReal){
   const pc=voiceCreatePeer(slotReal);
   // los tracks ya se agregan en voiceCreatePeer si VOICE.stream existe
   try{
-    // offer con audio
-    const offer=await pc.createOffer({offerToReceiveAudio:true});
+    // esperar a que ICE gathering complete para tener candidates TURN
+    const offer=await pc.createOffer({offerToReceiveAudio:true,voiceActivityDetection:false});
     await pc.setLocalDescription(offer);
     await voicePatch(d=>{
       if(!d.offers)d.offers=[];
@@ -4697,7 +4712,11 @@ function voiceStartDetection(){
           S._voiceSpeaking[MP.mySlot]=VOICE.speaking;
           if(!S._voiceActive)S._voiceActive={};
           S._voiceActive[MP.mySlot]=true;
-          if(MP.mode==='multi')mpPublicarEstado().catch(()=>{});
+          // publicar solo el speaking, no todo el estado del juego
+          if(MP.mode==='multi'&&MP.salaId){
+            const mini={...S,_voiceSpeaking:{...S._voiceSpeaking},_voiceActive:{...S._voiceActive}};
+            mpPublicarEstado().catch(()=>{});
+          }
         }
       }
       requestAnimationFrame(detect);
@@ -4787,12 +4806,21 @@ function drawVoiceUI(){
   const btn=document.createElement('button');
   btn.id='VOICE_BTN';
   const isSpeaking=VOICE.speaking;
-  const color=VOICE.enabled?(isSpeaking?'#7be87b':'#C9A84C'):'rgba(232,220,200,.35)';
-  const bg=VOICE.enabled?'rgba(0,0,0,.75)':'rgba(0,0,0,.5)';
-  const icon=VOICE.enabled?(isSpeaking?'🔊':'🎙️'):'🎙️';
-  btn.style.cssText=`position:absolute;bottom:70px;right:8px;z-index:850;width:38px;height:38px;border-radius:50%;border:2px solid ${color};background:${bg};font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:border-color .2s;box-shadow:${isSpeaking?'0 0 10px rgba(123,232,123,.6)':'none'}`;
+  // Verificar estado de conexiones peer
+  const peers=Object.values(VOICE.peers||{});
+  const connState=peers.length===0?'none':
+    peers.some(p=>p.connectionState==='connected'||p.connectionState==='completed')?'connected':
+    peers.some(p=>p.connectionState==='connecting'||p.iceConnectionState==='checking')?'connecting':'failed';
+  const color=VOICE.enabled?
+    (isSpeaking?'#7be87b':connState==='connected'?'#C9A84C':connState==='connecting'?'#4A9EE8':'rgba(226,75,74,.8)'):
+    'rgba(232,220,200,.35)';
+  const bg=VOICE.enabled?'rgba(0,0,0,.85)':'rgba(0,0,0,.5)';
+  const icon=!VOICE.enabled?'🎙️':isSpeaking?'🔊':'🎙️';
+  const stateHint=VOICE.enabled?(connState==='connected'?'':'connecting'==='connecting'?'⟳':'⚠'):'';
+  btn.style.cssText=`position:absolute;bottom:70px;right:8px;z-index:850;width:38px;height:38px;border-radius:50%;border:2px solid ${color};background:${bg};font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:border-color .2s;box-shadow:${isSpeaking?'0 0 10px rgba(123,232,123,.6)':connState==='connected'&&VOICE.enabled?'0 0 6px rgba(201,168,76,.4)':'none'}`;
   btn.textContent=icon;
-  btn.title=VOICE.enabled?'Desactivar micrófono':'Activar micrófono';
+  const stateText=VOICE.enabled?(connState==='connected'?'Conectado — click para desactivar':connState==='connecting'?'Conectando...':'Sin conexión de voz'):'Activar micrófono';
+  btn.title=stateText;
   btn.addEventListener('click',voiceToggle);
   btn.addEventListener('touchend',e=>{e.preventDefault();voiceToggle();},{passive:false});
   $('G').appendChild(btn);
