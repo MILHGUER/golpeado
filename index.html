@@ -980,6 +980,18 @@ function showBetScreen(){
 }
 
 // ── Cargar ranking inline en pantalla de apuesta ──
+// Calcular días desde una fecha ISO (created_at de Supabase)
+function diasEnTop(createdAt){
+  if(!createdAt)return null;
+  try{
+    const fecha=new Date(createdAt);
+    const hoy=new Date();
+    const diff=Math.floor((hoy-fecha)/(1000*60*60*24));
+    if(diff===0)return 'hoy';
+    if(diff===1)return '1 día';
+    return diff+' días';
+  }catch(e){return null;}
+}
 async function betRankLoad(ov,page){
   const listEl=ov.querySelector('#BET_RANK_LIST');
   const pagesEl=ov.querySelector('#BET_RANK_PAGES');
@@ -1013,12 +1025,17 @@ async function betRankLoad(ov,page){
       const bg=esYo?'rgba(74,158,232,.12)':isTop3?'rgba(201,168,76,.08)':'rgba(255,255,255,.02)';
       const border=esYo?'rgba(74,158,232,.4)':isTop3?'rgba(201,168,76,.25)':'rgba(255,255,255,.06)';
       const nameColor=esYo?'#4A9EE8':isTop3?'var(--gold)':'rgba(232,220,200,.75)';
+      const dias=isTop3?diasEnTop(r.created_at):null;
+      const diasHtml=dias?`<span style="color:rgba(255,200,60,.7);font-size:8px;font-style:italic"> · 👑 ${dias} en el top</span>`:'';
+      const paisBandera=`${r.bandera||'🌍'} ${r.pais||''}`.trim();
       html+=`<div style="display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:7px;border:1px solid ${border};background:${bg}">
         <span style="font-size:${isTop3?'16':'11'}px;min-width:20px;text-align:center">${medal}</span>
-        <span style="font-size:12px">${r.bandera||'🌍'}</span>
         <div style="flex:1;min-width:0">
           <div style="font-family:Cinzel,serif;font-size:10px;color:${nameColor};font-weight:${isTop3||esYo?700:400};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.nombre}${esYo?' ← tú':''}</div>
-          <div style="font-size:8px;color:rgba(232,220,200,.3);margin-top:1px">${r.pais||''} · ${r.fecha||''}</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:1px;flex-wrap:nowrap;overflow:hidden">
+            <span style="font-size:13px;line-height:1;flex-shrink:0">${r.bandera||'🌍'}</span>
+            <span style="font-size:8px;color:rgba(232,220,200,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.pais||''}${r.fecha?` · ${r.fecha}`:''}${diasHtml}</span>
+          </div>
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-family:Cinzel,serif;font-size:15px;color:${isTop3?'var(--gold)':'rgba(232,220,200,.6)'};font-weight:700">${r.racha}</div>
@@ -3475,12 +3492,17 @@ async function rankingLoadPage(ov,page){
       const isTop3=pos<=3;
       const bg=pos===1?'rgba(201,168,76,.12)':pos===2?'rgba(180,180,180,.08)':pos===3?'rgba(176,102,41,.08)':'rgba(255,255,255,.03)';
       const border=pos===1?'rgba(201,168,76,.35)':pos===2?'rgba(180,180,180,.25)':pos===3?'rgba(176,102,41,.25)':'rgba(255,255,255,.07)';
+      const diasR=isTop3?diasEnTop(r.created_at):null;
+      const diasHtmlR=diasR?`<span style="color:rgba(255,200,60,.75);font-style:italic"> · 👑 ${diasR} en el top</span>`:'';
+      const paisBanderaR=`${r.bandera||'🌍'} ${r.pais||''}`.trim();
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid ${border};background:${bg}">
         <span style="font-size:${isTop3?'18':'13'}px;min-width:22px;text-align:center">${medal}</span>
-        <span style="font-size:13px">${r.bandera||'🌍'}</span>
         <div style="flex:1;min-width:0">
           <div style="font-family:Cinzel,serif;font-size:11px;color:${isTop3?'var(--gold)':'rgba(232,220,200,.85)'};font-weight:${isTop3?700:400};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.nombre}</div>
-          <div style="font-size:9px;color:rgba(232,220,200,.35)">${r.fecha||''}</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:1px;flex-wrap:nowrap;overflow:hidden">
+            <span style="font-size:14px;line-height:1;flex-shrink:0">${r.bandera||'🌍'}</span>
+            <span style="font-size:9px;color:rgba(232,220,200,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.pais||''}${r.fecha?` · ${r.fecha}`:''}${diasHtmlR}</span>
+          </div>
         </div>
         <div style="text-align:right">
           <div style="font-family:Cinzel,serif;font-size:16px;color:${isTop3?'var(--gold)':'rgba(232,220,200,.7)'};font-weight:700">${r.racha}</div>
