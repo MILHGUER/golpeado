@@ -418,6 +418,22 @@ function jokerValue(nonJokers){
   if(!nonJokers.length)return 7;
   const hasAce=nonJokers.some(c=>c.n===1);
   const hasKing=nonJokers.some(c=>c.n===13);
+  const hasHigh=nonJokers.some(c=>c.n>=10&&c.n<=12); // J,Q sin K
+
+  // Caso especial: A(1) + cartas altas (J,Q) sin K → escalera circular J,Q,K,A
+  // El Joker debe ser K(13), no el 2
+  if(hasAce&&hasHigh&&!hasKing){
+    // Tratar A=14 para detectar que el Joker es 13
+    const valsCirc=nonJokers.map(c=>c.n===1?14:c.n).sort((a,b)=>a-b);
+    // El hueco está entre el número más alto y el A(14)
+    for(let i=1;i<valsCirc.length;i++){
+      if(valsCirc[i]-valsCirc[i-1]>1)return valsCirc[i-1]+1;
+    }
+    // Sin hueco interno con A=14: extender
+    if(valsCirc[0]>1)return valsCirc[0]-1; // antes del primero
+    return valsCirc[valsCirc.length-1]+1; // después del último (sería 15, pero en práctica no llega)
+  }
+
   let vals=nonJokers.map(c=>(hasAce&&hasKing&&c.n===1)?14:c.n).sort((a,b)=>a-b);
   // buscar el primer hueco interno
   for(let i=1;i<vals.length;i++){
@@ -446,6 +462,7 @@ function sortCombo(combo){
 
   // Función que asigna valor de ordenamiento a cada carta
   // detecta automáticamente si la escalera es circular (K,A,2 o K,A,2,3)
+  const hasHighCard=nonJokers.some(c=>c.n>=10&&c.n<=12); // J,Q sin K
   const sortVal=c=>{
     if(c.jk)return -1; // placeholder, se reemplaza abajo
     if(hasAce&&hasKing&&hasLow){
@@ -456,6 +473,10 @@ function sortCombo(combo){
     }
     if(hasAce&&hasKing){
       // Q,K,A — As al final como 14
+      return c.n===1?14:c.n;
+    }
+    if(hasAce&&hasHighCard&&!hasKing){
+      // J,Q,Joker(K),A — As al final como 14 (escalera circular sin K explícito)
       return c.n===1?14:c.n;
     }
     return c.n; // A,2,3 — As como 1
@@ -470,6 +491,7 @@ function sortCombo(combo){
   const jSortVal=(()=>{
     if(hasAce&&hasKing&&hasLow&&jv>=2&&jv<=3)return jv+13;
     if(hasAce&&hasKing&&jv===1)return 14;
+    if(hasAce&&hasHighCard&&!hasKing&&jv===13)return 13; // J,Q,Joker(K),A → Joker=13
     return jv;
   })();
   return cards.sort((a,b)=>{
@@ -544,7 +566,10 @@ function getJokerValue(combo){
   if(!nonJ.length)return -1;
   const hasAce=nonJ.some(c=>c.n===1);
   const hasKing=nonJ.some(c=>c.n===13);
-  const val=c=>(hasAce&&hasKing&&c.n===1)?14:c.n;
+  const hasHighC=nonJ.some(c=>c.n>=10&&c.n<=12); // J,Q sin K
+  // A=14 si: (hay K) O (hay cartas altas J,Q sin K → escalera circular con Joker=K)
+  const aceAs14=(hasAce&&hasKing)||(hasAce&&hasHighC&&!hasKing);
+  const val=c=>(aceAs14&&c.n===1)?14:c.n;
   // vecino izquierdo
   const leftCards=ord.slice(0,jokerIdx).filter(c=>!c.jk);
   const rightCards=ord.slice(jokerIdx+1).filter(c=>!c.jk);
@@ -1023,7 +1048,7 @@ function calcPayments(winners,adj,tie,gp,gWon){
 function startGame(){
   UID=0;
   clearRevTimer();
-  Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null});
+  Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{}});
   redraw();
   showBetScreen(); // primero apuesta, luego baraja
 }
@@ -1750,7 +1775,7 @@ function nuevaPartida(){
     voiceStop(true); // detener voz al volver al lobby (sin publicar estado)
     stopPoll();
     // ── LIMPIAR estado del juego anterior completamente ──
-    Object.assign(S,{deck:[],disc:[],hands:Array.from({length:S.np},()=>[]),shown:Array.from({length:S.np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null});
+    Object.assign(S,{deck:[],disc:[],hands:Array.from({length:S.np},()=>[]),shown:Array.from({length:S.np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{}});
     MP.mySlot=MP.isHost?0:MP.mySlot; // mantener slot
     // publicar estado de lobby para que todos vean la sala de espera
     const lobbyState={
@@ -2195,6 +2220,8 @@ function drawHand(){
   // indicador de voz propio junto al label de la mano
   const myVoiceInd=$('MY_VOICE_IND');
   if(myVoiceInd){
+    if(!VOICE.enabled)myVoiceInd.textContent='';
+    else myVoiceInd.style.cssText=VOICE.speaking?'font-size:14px;color:#7be87b':'font-size:13px;color:rgba(232,220,200,.5)';
     myVoiceInd.textContent=VOICE.enabled?(VOICE.speaking?'🔊':'🎙️'):'';
   }
 
@@ -2981,7 +3008,7 @@ function handleEstadoRemoto(estado){
       // limpiar estado del juego anterior al volver al lobby
       rmEl('OV');rmEl('SHUF');rmEl('PNLT_OV');rmEl('CONFIRM_LISTO');
       const np=estado.jugadores?estado.jugadores.length:S.np||2;
-      Object.assign(S,{deck:[],disc:[],hands:Array.from({length:np},()=>[]),shown:Array.from({length:np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null});
+      Object.assign(S,{deck:[],disc:[],hands:Array.from({length:np},()=>[]),shown:Array.from({length:np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{}});
       redraw(); // limpiar tablero
       buildLobbyUI(estado,MP.isHost);
     }
@@ -3590,6 +3617,7 @@ function aplicarEstadoRemoto(estado){
   S._fitTarget=estado._fitTarget||null;
   S._fitCandidates=estado._fitCandidates?new Set(estado._fitCandidates):null;
   S._voiceActive=estado._voiceActive||{};
+  S._voiceSpeaking=estado._voiceSpeaking||{};
   BET=estado.apuesta||0;
 
   redraw();
@@ -3652,6 +3680,7 @@ async function mpPublicarEstado(){
       // usar fase correcta para que handleEstadoRemoto lo enrute bien
       fase:S.phase==='mesa_final'?'mesa_final':(S.phase==='golpeado_reveal'?'golpeado_reveal':'jugando'),
       _voiceActive:S._voiceActive||{},
+      _voiceSpeaking:S._voiceSpeaking||{},
       np,
       jugadores:MP._jugadores||[],
       apuesta:BET,
@@ -3967,13 +3996,25 @@ function voiceStartDetection(){
     VOICE.analyser.fftSize=512;
     src.connect(VOICE.analyser);
     const buf=new Uint8Array(VOICE.analyser.frequencyBinCount);
+    let lastSpeakingPublished=false;
     const detect=()=>{
       if(!VOICE.enabled){VOICE.speaking=false;return;}
       VOICE.analyser.getByteFrequencyData(buf);
       const vol=buf.reduce((a,b)=>a+b,0)/buf.length;
       const wasSpeaking=VOICE.speaking;
       VOICE.speaking=(vol>10);
-      if(VOICE.speaking!==wasSpeaking)redraw();
+      if(VOICE.speaking!==wasSpeaking){
+        redraw();
+        // publicar estado de speaking para que los otros jugadores lo vean
+        if(VOICE.speaking!==lastSpeakingPublished){
+          lastSpeakingPublished=VOICE.speaking;
+          if(!S._voiceSpeaking)S._voiceSpeaking={};
+          S._voiceSpeaking[MP.mySlot]=VOICE.speaking;
+          if(!S._voiceActive)S._voiceActive={};
+          S._voiceActive[MP.mySlot]=true;
+          if(MP.mode==='multi')mpPublicarEstado().catch(()=>{});
+        }
+      }
       requestAnimationFrame(detect);
     };
     detect();
@@ -4030,8 +4071,11 @@ function voiceStop(skipPublish){
   VOICE.speaking=false;
   VOICE.speakingPeers={};
   // publicar que ya no tengo voz activa (solo si no estamos cambiando de partida)
-  if(!skipPublish&&S._voiceActive&&MP.mySlot>=0){
+  if(!skipPublish&&MP.mySlot>=0){
+    if(!S._voiceActive)S._voiceActive={};
+    if(!S._voiceSpeaking)S._voiceSpeaking={};
     S._voiceActive[MP.mySlot]=false;
+    S._voiceSpeaking[MP.mySlot]=false;
     if(MP.mode==='multi')setTimeout(()=>mpPublicarEstado(),200);
   }
   if(VOICE.pollInterval){clearInterval(VOICE.pollInterval);VOICE.pollInterval=null;}
@@ -4081,14 +4125,14 @@ function getVoiceIndicator(slotLocal){
     return VOICE.speaking?'🔊':'🎙️';
   }
 
-  // indicador de otro jugador
-  const isSpeaking=VOICE.speakingPeers[slotReal];
+  // indicador de otro jugador — usar estado publicado en Supabase como fuente principal
+  const isSpeakingLocal=VOICE.speakingPeers[slotReal]; // detección local de audio
+  const isSpeakingRemote=S._voiceSpeaking&&S._voiceSpeaking[slotReal]; // publicado por el otro
+  const hasRemoteVoice=S._voiceActive&&S._voiceActive[slotReal];
   const peer=VOICE.peers[slotReal];
   const isActive=peer&&peer.connectionState!=='failed'&&peer.connectionState!=='closed';
-  // también mostrar si hay estado de voz publicado en el estado remoto
-  const hasRemoteVoice=S._voiceActive&&S._voiceActive[slotReal];
 
-  if(isSpeaking)return '🔊';
+  if(isSpeakingLocal||isSpeakingRemote)return '🔊';
   if(isActive||hasRemoteVoice)return '🎙️';
   return '';
 }
