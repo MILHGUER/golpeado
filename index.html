@@ -1774,29 +1774,12 @@ function botTurn(pid){
   }
 
   // — Intentar tomar descarte —
+  // REGLA: el bot solo puede tomar el descarte para formar un NUEVO combo
+  // con cartas de su mano. NO puede encajar el descarte en combos ya mostrados.
   if(S.disc.length){
     const top=S.disc[S.disc.length-1];
-    const allShownCombos=S.shown.flat();
 
-    // a) El descarte encaja en un combo propio ya mostrado
-    const fitInOwn=S.shown[pid].find(combo=>canFit(combo.cards,top,combo));
-    if(fitInOwn){
-      S.disc.pop();
-      fitInOwn.cards.push(top);fitInOwn.order=null;
-      S.msg=`${PNAME(pid)} encajó ${dispN(top)+top.s} en su combo.`;
-      botDiscard(pid);return;
-    }
-
-    // b) El descarte encaja en combo de otro jugador (si el bot tiene acceso)
-    const fitInOther=allShownCombos.find(combo=>canFit(combo.cards,top,combo));
-    if(fitInOther&&Math.random()<0.7){// 70% de chances de aprovechar combos ajenos
-      S.disc.pop();
-      fitInOther.cards.push(top);fitInOther.order=null;
-      S.msg=`${PNAME(pid)} encajó ${dispN(top)+top.s} en un combo de la mesa.`;
-      botDiscard(pid);return;
-    }
-
-    // c) El descarte forma combo con 2 cartas de la mano
+    // El descarte forma combo nuevo con 2 cartas de la mano
     for(let i=0;i<h.length;i++)for(let j=i+1;j<h.length;j++){
       if(validCombo([h[i],h[j],top])){
         const a=h[i],b=h[j];
@@ -1805,16 +1788,14 @@ function botTurn(pid){
         const _ct={cards:[a,b,top],type:comboType([a,b,top])};
         _ct.order=sortCombo(_ct);S.shown[pid].push(_ct);
         S.msg=`${PNAME(pid)} tomó el descarte y mostró combo.`;
-        // Intentar bajar más combos después
         botBajarCombos(pid);
         botEncajarEnMesa(pid);
         botDiscard(pid);return;
       }
     }
 
-    // d) El descarte reduce los puntos de la mano (si los puntos son ≥7 y la carta lo mejora)
+    // Intercambio: tomar el descarte si reduce puntos en mano
     if(ptsMano>=7&&cv(top)<=4){
-      // Solo tomar si podemos descartar algo peor
       const peor=h.reduce((a,b)=>cv(a)>=cv(b)?a:b);
       if(cv(peor)>cv(top)+2){
         S.disc.pop();S.hands[pid].push(top);
