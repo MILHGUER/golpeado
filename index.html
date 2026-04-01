@@ -420,18 +420,23 @@ function jokerValue(nonJokers){
   const hasKing=nonJokers.some(c=>c.n===13);
   const hasHigh=nonJokers.some(c=>c.n>=10&&c.n<=12); // J,Q sin K
 
-  // Caso especial: A(1) + cartas altas (J,Q) sin K → escalera circular J,Q,K,A
-  // El Joker debe ser K(13), no el 2
+  // Caso especial: A(1) + cartas altas (J,Q) sin K → escalera circular J,Q,K,A,2,3...
+  // El Joker debe ser K(13)
   if(hasAce&&hasHigh&&!hasKing){
-    // Tratar A=14 para detectar que el Joker es 13
-    const valsCirc=nonJokers.map(c=>c.n===1?14:c.n).sort((a,b)=>a-b);
-    // El hueco está entre el número más alto y el A(14)
+    const hasLowToo=nonJokers.some(c=>c.n>=2&&c.n<=5);
+    // Tratar A=14, bajos=n+13 para detectar la posición del Joker
+    const valsCirc=nonJokers.map(c=>{
+      if(c.n===1)return 14;
+      if(hasLowToo&&c.n>=2&&c.n<=5)return c.n+13; // 2→15, 3→16
+      return c.n;
+    }).sort((a,b)=>a-b);
+    // Buscar el hueco
     for(let i=1;i<valsCirc.length;i++){
       if(valsCirc[i]-valsCirc[i-1]>1)return valsCirc[i-1]+1;
     }
-    // Sin hueco interno con A=14: extender
-    if(valsCirc[0]>1)return valsCirc[0]-1; // antes del primero
-    return valsCirc[valsCirc.length-1]+1; // después del último (sería 15, pero en práctica no llega)
+    // Sin hueco: extender por el extremo que corresponda
+    if(valsCirc[0]>1)return valsCirc[0]-1;
+    return valsCirc[valsCirc.length-1]+1;
   }
 
   let vals=nonJokers.map(c=>(hasAce&&hasKing&&c.n===1)?14:c.n).sort((a,b)=>a-b);
@@ -463,20 +468,29 @@ function sortCombo(combo){
   // Función que asigna valor de ordenamiento a cada carta
   // detecta automáticamente si la escalera es circular (K,A,2 o K,A,2,3)
   const hasHighCard=nonJokers.some(c=>c.n>=10&&c.n<=12); // J,Q sin K
+  // Detectar si hay bajos (2,3,4,5) en combinación con altos y A (escalera circular extendida)
+  const hasLowAndHigh=hasAce&&hasHighCard&&!hasKing&&nonJokers.some(c=>c.n>=2&&c.n<=5);
   const sortVal=c=>{
     if(c.jk)return -1; // placeholder, se reemplaza abajo
     if(hasAce&&hasKing&&hasLow){
       // escalera circular: K=13, A=14, 2=15, 3=16...
       if(c.n===1)return 14;
-      if(c.n<=3)return c.n+13; // 2→15, 3→16
+      if(c.n<=5)return c.n+13; // 2→15, 3→16, 4→17, 5→18
       return c.n;
     }
     if(hasAce&&hasKing){
       // Q,K,A — As al final como 14
       return c.n===1?14:c.n;
     }
+    if(hasLowAndHigh){
+      // J,Q,Joker(K),A,2,3 — escalera circular extendida
+      // Orden: J(11),Q(12),Joker(13),A(14),2(15),3(16)
+      if(c.n===1)return 14;
+      if(c.n>=2&&c.n<=5)return c.n+13; // 2→15, 3→16, 4→17
+      return c.n;
+    }
     if(hasAce&&hasHighCard&&!hasKing){
-      // J,Q,Joker(K),A — As al final como 14 (escalera circular sin K explícito)
+      // J,Q,Joker(K),A — As al final como 14
       return c.n===1?14:c.n;
     }
     return c.n; // A,2,3 — As como 1
@@ -489,9 +503,10 @@ function sortCombo(combo){
   const jv=jokerValue(nonJokers);
   // jokerValue devuelve el número "real" (ej 11 para J); convertirlo al mismo espacio
   const jSortVal=(()=>{
-    if(hasAce&&hasKing&&hasLow&&jv>=2&&jv<=3)return jv+13;
+    if(hasAce&&hasKing&&hasLow&&jv>=2&&jv<=5)return jv+13;
     if(hasAce&&hasKing&&jv===1)return 14;
-    if(hasAce&&hasHighCard&&!hasKing&&jv===13)return 13; // J,Q,Joker(K),A → Joker=13
+    if(hasLowAndHigh&&jv===13)return 13; // J,Q,Joker(K),A,2 → Joker=13
+    if(hasAce&&hasHighCard&&!hasKing&&jv===13)return 13;
     return jv;
   })();
   return cards.sort((a,b)=>{
@@ -532,7 +547,10 @@ function isJokerPosValid(orderedCards,jokerPos){
 
   const hasAce=nonJ.some(x=>x.c.n===1);
   const hasKing=nonJ.some(x=>x.c.n===13);
-  const val=c=>(hasAce&&hasKing&&c.n===1)?14:c.n;
+  const hasHighCard=nonJ.some(x=>x.c.n>=10&&x.c.n<=12);
+  // A=14 si hay K, o si hay cartas altas (J,Q) sin K (escalera circular con Joker=K)
+  const aceAs14=(hasAce&&hasKing)||(hasAce&&hasHighCard&&!hasKing);
+  const val=c=>(aceAs14&&c.n===1)?14:c.n;
 
   // vecino izquierdo y derecho del Joker en el orden propuesto
   const left=nonJ.filter(x=>x.i<jokerPos).slice(-1)[0];
@@ -543,12 +561,13 @@ function isJokerPosValid(orderedCards,jokerPos){
     return val(right.c)-val(left.c)===2;
   }
   if(left&&!right){
-    // Joker al final: el valor que representaría es val(left)+1, debe ser ≤13 (o ≤14 si hay circular)
+    // Joker al final: valor = val(left)+1, debe ser ≤14
     const jv=val(left.c)+1;
-    return jv<=13||(hasAce&&hasKing&&jv===14);
+    return jv<=14;
   }
   if(!left&&right){
-    // Joker al inicio: valor representado = val(right)-1, debe ser ≥1 (o ≥2 si A ya está)
+    // Joker al inicio: valor = val(right)-1
+    // En escalera circular con A=14 al final, el Joker puede ir antes del primero
     const jv=val(right.c)-1;
     return jv>=1;
   }
@@ -761,18 +780,35 @@ let BET=0; // apuesta actual de la partida
 function showBetScreen(){
   rmEl('BET_OV');
   BET=0;
+  const isSolo=MP.mode==='solo';
   const ov=document.createElement('div');ov.id='BET_OV';
-  ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.92);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:350;padding:20px';
+  // Si es modo bots: pantalla completa con scroll para mostrar ranking abajo
+  ov.style.cssText=`position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:0;z-index:350;overflow-y:auto;-webkit-overflow-scrolling:touch`;
 
   ov.innerHTML=`
-    <div style="font-family:Cinzel,serif;font-size:18px;color:var(--gold);letter-spacing:.1em">Apuesta</div>
-    <div style="font-size:11px;color:rgba(232,220,200,.6);text-align:center">Elegí el valor de la ficha para esta partida.<br>Todos los jugadores apuestan lo mismo.</div>
-    <div id="CHIP_ROW" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"></div>
-    <div id="BET_INFO" style="font-family:Cinzel,serif;font-size:14px;color:rgba(232,220,200,.4)">Seleccioná una ficha</div>
-    <div style="display:flex;gap:10px;width:100%;max-width:280px">
-      <button id="BET_SKIP" style="flex:1;padding:10px;border-radius:6px;border:1.5px solid rgba(232,220,200,.3);background:transparent;color:rgba(232,220,200,.5);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">Sin apuesta</button>
-      <button id="BET_OK" disabled style="flex:2;padding:10px;border-radius:6px;border:1.5px solid var(--gold);background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;opacity:.4">Apostar →</button>
-    </div>`;
+    <div style="width:100%;max-width:340px;padding:20px 16px 0;display:flex;flex-direction:column;align-items:center;gap:12px;flex-shrink:0">
+      <div style="font-family:Cinzel,serif;font-size:18px;color:var(--gold);letter-spacing:.1em;margin-top:4px">Apuesta</div>
+      <div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center">Elegí el valor de la ficha para esta partida.</div>
+      <div id="CHIP_ROW" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"></div>
+      <div id="BET_INFO" style="font-family:Cinzel,serif;font-size:13px;color:rgba(232,220,200,.4)">Seleccioná una ficha</div>
+      <div style="display:flex;gap:10px;width:100%">
+        <button id="BET_SKIP" style="flex:1;padding:10px;border-radius:6px;border:1.5px solid rgba(232,220,200,.3);background:transparent;color:rgba(232,220,200,.5);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">Sin apuesta</button>
+        <button id="BET_OK" disabled style="flex:2;padding:10px;border-radius:6px;border:1.5px solid var(--gold);background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;opacity:.4">Jugar →</button>
+      </div>
+    </div>
+    ${isSolo?`
+    <div style="width:100%;max-width:340px;padding:16px 16px 20px;display:flex;flex-direction:column;align-items:center;gap:8px">
+      <div style="width:100%;display:flex;align-items:center;gap:8px;margin-bottom:2px">
+        <div style="flex:1;height:1px;background:rgba(201,168,76,.2)"></div>
+        <div style="font-family:Cinzel,serif;font-size:11px;color:var(--gold);letter-spacing:.1em;white-space:nowrap">🏆 RANKING DE RACHAS</div>
+        <div style="flex:1;height:1px;background:rgba(201,168,76,.2)"></div>
+      </div>
+      <div id="BET_RANK_LIST" style="width:100%;display:flex;flex-direction:column;gap:4px">
+        <div style="text-align:center;color:rgba(232,220,200,.3);font-size:10px;padding:12px">Cargando ranking...</div>
+      </div>
+      <div id="BET_RANK_PAGES" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;margin-top:2px"></div>
+    </div>
+    `:''}`;
 
   // crear fichas
   const row=ov.querySelector('#CHIP_ROW');
@@ -802,6 +838,81 @@ function showBetScreen(){
   ok.addEventListener('click',doOk);ok.addEventListener('touchend',e=>{e.preventDefault();doOk();},{passive:false});
 
   $('G').appendChild(ov);
+
+  // Cargar ranking inline si es modo bots
+  if(isSolo)betRankLoad(ov,1);
+}
+
+// ── Cargar ranking inline en pantalla de apuesta ──
+async function betRankLoad(ov,page){
+  const listEl=ov.querySelector('#BET_RANK_LIST');
+  const pagesEl=ov.querySelector('#BET_RANK_PAGES');
+  if(!listEl)return;
+  listEl.innerHTML='<div style="text-align:center;color:rgba(232,220,200,.3);font-size:10px;padding:12px">Cargando...</div>';
+
+  try{
+    const all=await sbFetch('/rest/v1/ranking?select=id&order=racha.desc');
+    const total=all?all.length:0;
+    const perPage=10;
+    const totalPages=Math.max(1,Math.ceil(total/perPage));
+    const offset=(page-1)*perPage;
+    const rows=await sbFetch(`/rest/v1/ranking?select=*&order=racha.desc,created_at.asc&limit=${perPage}&offset=${offset}`);
+
+    if(!rows||!rows.length){
+      listEl.innerHTML='<div style="text-align:center;color:rgba(232,220,200,.3);font-size:10px;padding:16px 8px">Nadie en el ranking aún.<br>¡Sé el primero!</div>';
+      if(pagesEl)pagesEl.innerHTML='';
+      return;
+    }
+
+    const medals=['🥇','🥈','🥉'];
+    // Mi racha actual (para resaltar si el jugador está ahí)
+    const miNombre=(()=>{try{return localStorage.getItem('golpeado_rank_nombre')||'';}catch(e){return '';}})();
+
+    let html='';
+    rows.forEach((r,idx)=>{
+      const pos=offset+idx+1;
+      const isTop3=pos<=3;
+      const esYo=miNombre&&r.nombre===miNombre;
+      const medal=isTop3?medals[pos-1]:`<span style="font-size:10px;color:rgba(232,220,200,.3);min-width:16px;display:inline-block;text-align:center">#${pos}</span>`;
+      const bg=esYo?'rgba(74,158,232,.12)':isTop3?'rgba(201,168,76,.08)':'rgba(255,255,255,.02)';
+      const border=esYo?'rgba(74,158,232,.4)':isTop3?'rgba(201,168,76,.25)':'rgba(255,255,255,.06)';
+      const nameColor=esYo?'#4A9EE8':isTop3?'var(--gold)':'rgba(232,220,200,.75)';
+      html+=`<div style="display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:7px;border:1px solid ${border};background:${bg}">
+        <span style="font-size:${isTop3?'16':'11'}px;min-width:20px;text-align:center">${medal}</span>
+        <span style="font-size:12px">${r.bandera||'🌍'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:Cinzel,serif;font-size:10px;color:${nameColor};font-weight:${isTop3||esYo?700:400};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.nombre}${esYo?' ← tú':''}</div>
+          <div style="font-size:8px;color:rgba(232,220,200,.3);margin-top:1px">${r.pais||''} · ${r.fecha||''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:Cinzel,serif;font-size:15px;color:${isTop3?'var(--gold)':'rgba(232,220,200,.6)'};font-weight:700">${r.racha}</div>
+          <div style="font-size:8px;color:rgba(232,220,200,.3)">seguidas</div>
+        </div>
+      </div>`;
+    });
+    listEl.innerHTML=html;
+
+    // Paginación compacta
+    if(pagesEl){
+      if(totalPages>1){
+        const bStyle=(active)=>`padding:4px 8px;border-radius:5px;border:1px solid rgba(201,168,76,${active?.4:.15});background:${active?'rgba(201,168,76,.12)':'transparent'};color:${active?'var(--gold)':'rgba(232,220,200,.35)'};font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation`;
+        let ph='';
+        if(page>1)ph+=`<button class="brp" data-p="${page-1}" style="${bStyle(false)}">‹</button>`;
+        const s=Math.max(1,page-2),e=Math.min(totalPages,page+2);
+        for(let p=s;p<=e;p++)ph+=`<button class="brp" data-p="${p}" style="${bStyle(p===page)}">${p}</button>`;
+        if(page<totalPages)ph+=`<button class="brp" data-p="${page+1}" style="${bStyle(false)}">›</button>`;
+        pagesEl.innerHTML=ph;
+        pagesEl.querySelectorAll('.brp').forEach(b=>{
+          b.addEventListener('click',()=>betRankLoad(ov,+b.dataset.p));
+          b.addEventListener('touchend',e=>{e.preventDefault();betRankLoad(ov,+b.dataset.p);},{passive:false});
+        });
+      } else {
+        pagesEl.innerHTML='';
+      }
+    }
+  }catch(e){
+    if(listEl)listEl.innerHTML=`<div style="text-align:center;color:rgba(226,75,74,.6);font-size:9px;padding:10px">Sin conexión al ranking</div>`;
+  }
 }
 
 // ── CUENTAS ──
@@ -1487,68 +1598,214 @@ function passTurn(){
   }
 }
 
-// BOT
+// ══════════════════════════════════════════════════════
+// BOT IA — NIVEL DIFÍCIL
+// Estrategia: guarda combos, encaja en combos ajenos,
+// descarta inteligentemente, GOLPEADO solo cuando puede ganar
+// ══════════════════════════════════════════════════════
 function botTurn(pid){
   if(S.over||S.cur!==pid)return;
   const h=S.hands[pid];
-  if(h.length<=3){
-    S.golpBy=pid;
-    showGolpeAnimation(`${PNAME(pid)} declaró GOLPEADO`,()=>startReveal());
-    return;
+
+  // — Calcular puntos actuales en mano —
+  const ptsMano=h.reduce((a,c)=>a+cv(c),0);
+
+  // — GOLPEADO solo si tiene pocas cartas Y los puntos son bajos —
+  // Condición: ≤4 cartas en mano Y pts bajos O ≤3 cartas
+  const ptsThreshold=pid===1?12:15; // Bot1 más agresivo, Bot2 más conservador
+  if(h.length<=3||(h.length<=4&&ptsMano<=ptsThreshold)){
+    // Verificar que ningún oponente tiene menos o igual puntos
+    const ptsPropios=ptsMano;
+    const ptsOponentes=S.hands.map((oh,i)=>{
+      if(i===pid)return 999;
+      const base=oh.reduce((a,c)=>a+cv(c),0);
+      const pen=usedBothWilds(i)?60:0;
+      return base+pen;
+    });
+    const minOponente=Math.min(...ptsOponentes);
+    // Solo golpear si claramente voy ganando O tengo ≤3 cartas
+    if(h.length<=3||ptsPropios<minOponente-3){
+      S.golpBy=pid;
+      showGolpeAnimation(`${PNAME(pid)} declaró GOLPEADO`,()=>startReveal());
+      return;
+    }
   }
-  // intentar tomar descarte solo si puede formar combo con él (obligatorio mostrarlo)
+
+  // — Intentar tomar descarte —
   if(S.disc.length){
     const top=S.disc[S.disc.length-1];
+    const allShownCombos=S.shown.flat();
+
+    // a) El descarte encaja en un combo propio ya mostrado
+    const fitInOwn=S.shown[pid].find(combo=>canFit(combo.cards,top,combo));
+    if(fitInOwn){
+      S.disc.pop();
+      fitInOwn.cards.push(top);fitInOwn.order=null;
+      S.msg=`${PNAME(pid)} encajó ${dispN(top)+top.s} en su combo.`;
+      botDiscard(pid);return;
+    }
+
+    // b) El descarte encaja en combo de otro jugador (si el bot tiene acceso)
+    const fitInOther=allShownCombos.find(combo=>canFit(combo.cards,top,combo));
+    if(fitInOther&&Math.random()<0.7){// 70% de chances de aprovechar combos ajenos
+      S.disc.pop();
+      fitInOther.cards.push(top);fitInOther.order=null;
+      S.msg=`${PNAME(pid)} encajó ${dispN(top)+top.s} en un combo de la mesa.`;
+      botDiscard(pid);return;
+    }
+
+    // c) El descarte forma combo con 2 cartas de la mano
     for(let i=0;i<h.length;i++)for(let j=i+1;j<h.length;j++){
       if(validCombo([h[i],h[j],top])){
         const a=h[i],b=h[j];
         S.disc.pop();
         S.hands[pid]=rmIds(S.hands[pid],[a.id,b.id]);
-        const _ct={cards:[a,b,top],type:comboType([a,b,top])};_ct.order=sortCombo(_ct);S.shown[pid].push(_ct);
-        S.msg=`Bot ${pid} tomó el descarte y mostró ${comboType([a,b,top])}.`;
-        // NO llama botShowOne — no muestra más combos voluntariamente
+        const _ct={cards:[a,b,top],type:comboType([a,b,top])};
+        _ct.order=sortCombo(_ct);S.shown[pid].push(_ct);
+        S.msg=`${PNAME(pid)} tomó el descarte y mostró combo.`;
+        // Intentar bajar más combos después
+        botBajarCombos(pid);
+        botEncajarEnMesa(pid);
         botDiscard(pid);return;
       }
     }
+
+    // d) El descarte reduce los puntos de la mano (si los puntos son ≥7 y la carta lo mejora)
+    if(ptsMano>=7&&cv(top)<=4){
+      // Solo tomar si podemos descartar algo peor
+      const peor=h.reduce((a,b)=>cv(a)>=cv(b)?a:b);
+      if(cv(peor)>cv(top)+2){
+        S.disc.pop();S.hands[pid].push(top);
+        S.disc.push(peor);S.hands[pid]=rmIds(S.hands[pid],[peor.id]);
+        S.msg=`${PNAME(pid)} intercambió cartas.`;
+        passTurn();return;
+      }
+    }
   }
-  // tomar del mazo — si está vacío, refill con descarte
+
+  // — Tomar del mazo —
   if(!S.deck.length&&S.disc.length){
     S.deck=[...S.disc];S.disc=[];
-    for(let i=S.deck.length-1;i>0;i--){const j=0|Math.random()*(i+1);[S.deck[i],S.deck[j]]=[S.deck[j],S.deck[i]];}
-    S.msg=`¡Mazo rearmado! Bot ${pid} toma del mazo.`;
+    shuf(S.deck);
+    S.msg=`¡Mazo rearmado!`;
   }
   if(S.deck.length)S.hands[pid].push(S.deck.pop());
-  // NO llama botShowOne — guarda sus combos hasta el GOLPEADO
+
+  // — Bajar todos los combos posibles —
+  botBajarCombos(pid);
+
+  // — Encajar cartas sueltas en combos de la mesa —
+  botEncajarEnMesa(pid);
+
   botDiscard(pid);
 }
 
-function botShowOne(pid){
-  const h=S.hands[pid];
-  for(let i=0;i<h.length;i++)for(let j=i+1;j<h.length;j++)for(let k=j+1;k<h.length;k++){
-    if(validCombo([h[i],h[j],h[k]])){
-      const a=h[i],b=h[j],cc=h[k];
-      S.hands[pid]=rmIds(S.hands[pid],[a.id,b.id,cc.id]);
-      const _ck={cards:[a,b,cc],type:comboType([a,b,cc])};_ck.order=sortCombo(_ck);S.shown[pid].push(_ck);
-      return;
+// Baja TODOS los combos válidos que puede formar
+function botBajarCombos(pid){
+  let found=true;
+  while(found){
+    found=false;
+    const h=S.hands[pid];
+    // buscar el MEJOR combo (el que deja menos pts en mano)
+    let bestCombo=null,bestScore=999,bestCards=null;
+    for(let i=0;i<h.length;i++)for(let j=i+1;j<h.length;j++)for(let k=j+1;k<h.length;k++){
+      if(validCombo([h[i],h[j],h[k]])){
+        // calcular cuántos pts quedarían en mano si bajamos este combo
+        const remaining=h.filter((_,x)=>x!==i&&x!==j&&x!==k);
+        const pts=remaining.reduce((a,c)=>a+cv(c),0);
+        if(pts<bestScore){bestScore=pts;bestCombo=[h[i],h[j],h[k]];bestCards=[i,j,k];}
+        // también probar combos de 4 y 5 cartas
+        for(let l=k+1;l<h.length;l++){
+          if(validCombo([h[i],h[j],h[k],h[l]])){
+            const rem4=h.filter((_,x)=>x!==i&&x!==j&&x!==k&&x!==l);
+            const p4=rem4.reduce((a,c)=>a+cv(c),0);
+            if(p4<bestScore){bestScore=p4;bestCombo=[h[i],h[j],h[k],h[l]];bestCards=[i,j,k,l];}
+          }
+        }
+      }
+    }
+    if(bestCombo){
+      S.hands[pid]=rmIds(S.hands[pid],bestCombo.map(c=>c.id));
+      const _ck={cards:bestCombo,type:comboType(bestCombo)};
+      _ck.order=sortCombo(_ck);S.shown[pid].push(_ck);
+      found=true;
     }
   }
+}
+
+// Encaja cartas sueltas en combos de la mesa (propios y ajenos)
+function botEncajarEnMesa(pid){
+  const h=S.hands[pid];
+  const allCombos=S.shown.flat();
+  if(!allCombos.length)return;
+  let changed=true;
+  while(changed){
+    changed=false;
+    const hand=S.hands[pid];
+    for(const card of hand){
+      // primero intentar en combos propios
+      const ownFit=S.shown[pid].find(c=>canFit(c.cards,card,c));
+      if(ownFit){
+        ownFit.cards.push(card);ownFit.order=null;
+        S.hands[pid]=rmIds(S.hands[pid],[card.id]);
+        changed=true;break;
+      }
+      // luego en combos ajenos (70% probabilidad para no ser predecible)
+      if(Math.random()<0.7){
+        const otherFit=S.shown.flat().filter(c=>!S.shown[pid].includes(c)).find(c=>canFit(c.cards,card,c));
+        if(otherFit){
+          otherFit.cards.push(card);otherFit.order=null;
+          S.hands[pid]=rmIds(S.hands[pid],[card.id]);
+          changed=true;break;
+        }
+      }
+    }
+  }
+}
+
+function botShowOne(pid){
+  // Esta función ya no se usa — botBajarCombos la reemplaza
+  botBajarCombos(pid);
 }
 
 function botDiscard(pid){
   const h=S.hands[pid];
   if(!h.length){passTurn();return;}
 
-  // si tiene ambos comodines, descartar uno
+  // si tiene ambos comodines, descartar el menos útil
   if(hasBothWilds(h)){
-    const drop=h.find(c=>c.jk)||h.find(c=>c.wl);
+    // descartar el comodín que menos combos potenciales tiene
+    const jk=h.find(c=>c.jk);
+    const wl=h.find(c=>c.wl);
+    const drop=jk||wl; // preferir descartar Joker (más común)
     S.disc.push(drop);S.hands[pid]=rmIds(S.hands[pid],[drop.id]);
-    S.msg=`Bot ${pid} descartó un comodín.`;passTurn();return;
+    S.msg=`${PNAME(pid)} descartó un comodín.`;passTurn();return;
   }
 
-  // descartar la carta de mayor valor
-  const worst=h.reduce((a,b)=>cv(a)>=cv(b)?a:b);
-  S.disc.push(worst);S.hands[pid]=rmIds(S.hands[pid],[worst.id]);
-  if(!S.msg.includes('tomó'))S.msg=`Bot ${pid} descartó.`;
+  // Descartar la carta más "inútil":
+  // = mayor valor Y que no forme parte de ningún par/trío/escalera potencial
+  const scored=h.map(card=>{
+    let potential=0;
+    // contar cuántas cartas de la mano complementan esta
+    for(const other of h){
+      if(other.id===card.id)continue;
+      if(other.n===card.n)potential+=3; // mismo número = grupo
+      if(other.s===card.s&&Math.abs(other.n-card.n)<=2)potential+=2; // misma pinta secuencial
+      if(other.s===card.s&&Math.abs(other.n-card.n)===1)potential+=3; // escalera directa
+    }
+    // también contar si encaja en algún combo ya mostrado
+    const allCombos=S.shown.flat();
+    for(const combo of allCombos){
+      if(canFit(combo.cards,card,combo))potential+=5;
+    }
+    return{card,score:potential,val:cv(card)};
+  });
+
+  // Descartar la de menor potencial; en empate, la de mayor valor
+  scored.sort((a,b)=>a.score-b.score||b.val-a.val);
+  const drop=scored[0].card;
+  S.disc.push(drop);S.hands[pid]=rmIds(S.hands[pid],[drop.id]);
+  if(!S.msg.includes('mostró')&&!S.msg.includes('encajó'))S.msg=`${PNAME(pid)} descartó.`;
   passTurn();
 }
 
@@ -2407,8 +2664,8 @@ function showFinalOv(){
   // tabla de resultados
   const rows=scores.map((sc,i)=>{
     const isW=adj[i]===min&&!tie;
-    const gpen=gp===i&&!gWon?`<span style="color:#E24B4A"> ×2</span>`:'';
-    const wpen=penalty[i]&&!(gp===i&&!gWon)?`<span style="color:#E24B4A"> +60★</span>`:'';
+    const gpen=gp===i&&!gWon&&!tie?`<span style="color:#E24B4A"> ×2</span>`:'';
+    const wpen=penalty[i]&&!(gp===i&&!gWon)&&!tie?`<span style="color:#E24B4A"> +60★</span>`:'';
     return`<tr class="${isW?'wrow':''}">
       <td style="color:${PCOLOR[i]};font-weight:700">${PNAME(i)}${gp===i?' ★':''}</td>
       <td>${sc}${gpen}${wpen}</td>
@@ -2420,8 +2677,9 @@ function showFinalOv(){
   let penResumen='';
   const penItems=[];
   for(let i=0;i<S.np;i++){
-    const golpoSinGanar=gp===i&&!gWon;
-    const usaComodines=usedBothWilds(i);
+    // En empate no hay penalizaciones que se apliquen (nadie paga)
+    const golpoSinGanar=gp===i&&!gWon&&!tie;
+    const usaComodines=usedBothWilds(i)&&!tie;
     if(golpoSinGanar)penItems.push({name:PNAME(i),color:PCOLOR[i],motivo:'Declaró GOLPEADO pero no ganó',icon:'👊'});
     else if(usaComodines)penItems.push({name:PNAME(i),color:PCOLOR[i],motivo:'Usó los 2 comodines (★ Joker + ✦ Grupal)',icon:'⚠️'});
   }
@@ -2468,16 +2726,32 @@ function showFinalOv(){
     <table class="rtbl"><tr><th>Jugador</th><th>Pts</th><th>Sobrantes</th></tr>${rows}</table>
     ${penResumen}${payHtml}
     <div style="display:flex;gap:8px;margin-top:6px;width:100%;max-width:280px">
-      <button class="btn" onclick="showCuentas()" style="flex:1">💰 Ver cuentas</button>
+      <button class="btn" onclick="showCuentas()" style="flex:1">💰 Cuentas</button>
+      ${MP.mode==='solo'?`<button class="btn" id="OV_RANK_BTN" style="flex:1">🏆 Ranking</button>`:''}
       <button class="btn pri" onclick="nuevaPartida()" style="flex:2">Nueva partida</button>
     </div>`;
 
   // touch events
   const btns=ov.querySelectorAll('button');
   btns[0].addEventListener('touchend',e=>{e.preventDefault();showCuentas();},{passive:false});
-  btns[1].addEventListener('touchend',e=>{e.preventDefault();nuevaPartida();},{passive:false});
+  if(MP.mode==='solo'){
+    const rankBtn=ov.querySelector('#OV_RANK_BTN');
+    if(rankBtn){
+      rankBtn.addEventListener('click',()=>showRankingScreen());
+      rankBtn.addEventListener('touchend',e=>{e.preventDefault();showRankingScreen();},{passive:false});
+    }
+    btns[btns.length-1].addEventListener('touchend',e=>{e.preventDefault();nuevaPartida();},{passive:false});
+  } else {
+    btns[1].addEventListener('touchend',e=>{e.preventDefault();nuevaPartida();},{passive:false});
+  }
 
   $('G').appendChild(ov);
+
+  // Procesar racha si es modo solo
+  if(MP.mode==='solo'){
+    const jugadorGano=winners.includes(0)&&!tie;
+    procesarRachaSolo(jugadorGano,tie);
+  }
 }
 
 // UTILS
@@ -2771,6 +3045,7 @@ function showModeScreen(){
       <button id="MS_SOLO" style="padding:14px;border-radius:8px;border:2px solid var(--gold);background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">
         🤖 Jugar con Bots
       </button>
+
       <button id="MS_CREAR" style="padding:14px;border-radius:8px;border:2px solid #4A9EE8;background:transparent;color:#4A9EE8;font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">
         🌐 Crear sala multijugador
       </button>
@@ -2785,6 +3060,7 @@ function showModeScreen(){
   const tap=(btn,fn)=>{btn.addEventListener('click',fn);btn.addEventListener('touchend',e=>{e.preventDefault();fn();},{passive:false});};
   const htp=ov.querySelector('#MS_HTP');if(htp)tap(htp,()=>showHowToPlay());
   tap(solo,()=>{MP.mode='solo';rmEl('MODE_OV');startGame();});
+
   tap(crear,()=>showNombreScreen('crear'));
   tap(unir,()=>showNombreScreen('unir'));
 }
@@ -2862,6 +3138,292 @@ function showNombreScreen(accion){
   ok.addEventListener('click',doOk);
   ok.addEventListener('touchend',e=>{e.preventDefault();doOk();},{passive:false});
   inp.addEventListener('keydown',e=>{if(e.key==='Enter')doOk();});
+}
+
+
+// ══════════════════════════════════════════════════════
+// SISTEMA DE RANKING — RACHAS CONSECUTIVAS VS BOTS
+// ══════════════════════════════════════════════════════
+const RANKING_KEY='golpeado_racha_v1';
+
+function rachaGet(){
+  try{return JSON.parse(localStorage.getItem(RANKING_KEY)||'{"actual":0,"mejor":0}');}
+  catch(e){return{actual:0,mejor:0};}
+}
+function rachaSet(data){
+  try{localStorage.setItem(RANKING_KEY,JSON.stringify(data));}catch(e){}
+}
+function rachaGano(){
+  const r=rachaGet();
+  r.actual++;
+  if(r.actual>r.mejor)r.mejor=r.actual;
+  rachaSet(r);
+}
+function rachaPerdio(){
+  const r=rachaGet();
+  const rachaFinal=r.actual;
+  r.actual=0;
+  rachaSet(r);
+  return rachaFinal; // devuelve la racha que acaba de terminar
+}
+
+// Obtener país del jugador via IP
+async function detectarPais(){
+  try{
+    const r=await fetch('https://ipapi.co/json/',{signal:AbortSignal.timeout(3000)});
+    const d=await r.json();
+    return{pais:d.country_name||'Desconocido',bandera:d.country_code?String.fromCodePoint(...[...d.country_code].map(c=>0x1F1E6+c.charCodeAt(0)-65)):'🌍'};
+  }catch(e){return{pais:'Desconocido',bandera:'🌍'};}
+}
+
+// Leer top ranking desde Supabase
+async function rankingGetTop(limit=10){
+  try{
+    const rows=await sbFetch('/rest/v1/ranking?select=*&order=racha.desc,created_at.asc&limit='+limit);
+    return rows||[];
+  }catch(e){return[];}
+}
+
+// Verificar si una racha entra al ranking (top 10 o supera record propio)
+async function rankingCalifica(racha){
+  if(racha<2)return false; // mínimo 2 victorias seguidas para aparecer
+  try{
+    const top=await rankingGetTop(10);
+    if(top.length<10)return true; // hay espacio
+    const min=top[top.length-1].racha;
+    return racha>min;
+  }catch(e){return false;}
+}
+
+// Verificar si el nombre ya existe en el ranking
+async function rankingNombreExiste(nombre){
+  try{
+    const rows=await sbFetch('/rest/v1/ranking?nombre=eq.'+encodeURIComponent(nombre)+'&select=id');
+    return rows&&rows.length>0;
+  }catch(e){return false;}
+}
+
+// Guardar o actualizar récord en ranking
+async function rankingGuardar(nombre,racha,pais,bandera){
+  const ahora=new Date();
+  const fecha=ahora.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'})+
+    ' '+ahora.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+  // Verificar si ya existe con ese nombre → actualizar si racha es mayor
+  try{
+    const rows=await sbFetch('/rest/v1/ranking?nombre=eq.'+encodeURIComponent(nombre)+'&select=*');
+    if(rows&&rows.length>0){
+      const existing=rows[0];
+      if(racha>existing.racha){
+        await sbFetch('/rest/v1/ranking?nombre=eq.'+encodeURIComponent(nombre),'PATCH',{racha,pais,bandera,fecha});
+      }
+      return existing.racha; // retorna racha anterior
+    } else {
+      await sbFetch('/rest/v1/ranking','POST',{nombre,racha,pais,bandera,fecha});
+      return 0;
+    }
+  }catch(e){console.log('ranking error:',e);return -1;}
+}
+
+// ── Pantalla de ingreso al ranking ──
+async function showRankingEntry(racha){
+  rmEl('RANK_ENTRY');
+  const ov=document.createElement('div');ov.id='RANK_ENTRY';
+  ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:900;padding:24px;text-align:center';
+
+  // Detectar país mientras carga
+  ov.innerHTML=`
+    <div style="font-size:40px">🏆</div>
+    <div style="font-family:Cinzel,serif;font-size:20px;color:var(--gold)">¡Entrás al Ranking!</div>
+    <div style="font-family:Cinzel,serif;font-size:13px;color:rgba(232,220,200,.7)">
+      Ganaste <span style="color:var(--gold);font-size:18px;font-weight:700">${racha}</span> partidas seguidas
+    </div>
+    <div style="font-size:11px;color:rgba(232,220,200,.5);font-style:italic">Detectando tu ubicación...</div>
+  `;
+  $('G').appendChild(ov);
+
+  const geo=await detectarPais();
+
+  ov.innerHTML=`
+    <div style="font-size:40px">🏆</div>
+    <div style="font-family:Cinzel,serif;font-size:20px;color:var(--gold)">¡Entrás al Ranking!</div>
+    <div style="font-family:Cinzel,serif;font-size:13px;color:rgba(232,220,200,.7)">
+      Ganaste <span style="color:var(--gold);font-size:18px;font-weight:700">${racha}</span> partidas seguidas
+    </div>
+    <div style="font-size:13px;color:rgba(232,220,200,.6)">${geo.bandera} ${geo.pais}</div>
+    <div style="width:100%;max-width:260px">
+      <div style="font-size:10px;color:rgba(232,220,200,.4);margin-bottom:6px;font-family:Cinzel,serif">TU NOMBRE (único, no repetido)</div>
+      <input id="RANK_INPUT" maxlength="20" placeholder="Tu apodo..." autocomplete="off"
+        style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1.5px solid rgba(201,168,76,.5);background:rgba(0,0,0,.5);color:#f0e6c8;font-family:Cinzel,serif;font-size:14px;text-align:center;outline:none">
+    </div>
+    <div id="RANK_MSG" style="font-size:10px;color:#E24B4A;min-height:14px"></div>
+    <div style="display:flex;gap:8px;width:100%;max-width:260px">
+      <button id="RANK_SKIP" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.4);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">
+        Omitir
+      </button>
+      <button id="RANK_OK" style="flex:2;padding:10px;border-radius:8px;border:none;background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation">
+        ✓ Guardar récord
+      </button>
+    </div>`;
+
+  const inp=ov.querySelector('#RANK_INPUT');
+  const msg=ov.querySelector('#RANK_MSG');
+  const skip=ov.querySelector('#RANK_SKIP');
+  const ok=ov.querySelector('#RANK_OK');
+  inp.focus();
+
+  const doSkip=()=>{rmEl('RANK_ENTRY');showFinalFull();};
+  const doOk=async()=>{
+    const nombre=inp.value.trim().replace(/[<>"']/g,'').slice(0,20);
+    if(!nombre){msg.textContent='Ingresá un nombre.';return;}
+    msg.textContent='Verificando...';
+    ok.disabled=true;
+    const existe=await rankingNombreExiste(nombre);
+    if(existe){msg.textContent='Ese nombre ya está registrado. Elegí otro.';ok.disabled=false;return;}
+    msg.textContent='Guardando...';
+    await rankingGuardar(nombre,racha,geo.pais,geo.bandera);
+    // guardar nombre en localStorage para futuras sesiones
+    try{localStorage.setItem('golpeado_rank_nombre',nombre);}catch(e){}
+    rmEl('RANK_ENTRY');
+    showRankingScreen();
+  };
+
+  skip.addEventListener('click',doSkip);
+  skip.addEventListener('touchend',e=>{e.preventDefault();doSkip();},{passive:false});
+  ok.addEventListener('click',doOk);
+  ok.addEventListener('touchend',e=>{e.preventDefault();doOk();},{passive:false});
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')doOk();});
+}
+
+// ── Pantalla del Ranking ──
+async function showRankingScreen(){
+  rmEl('RANKING_OV');
+  const ov=document.createElement('div');ov.id='RANKING_OV';
+  ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:850;padding:18px 14px;overflow-y:auto';
+
+  ov.innerHTML=`
+    <div style="font-family:Cinzel,serif;font-size:18px;color:var(--gold);letter-spacing:.1em;padding-top:4px">🏆 RANKING DE RACHAS</div>
+    <div style="font-size:9px;color:rgba(232,220,200,.4);font-family:Cinzel,serif;letter-spacing:.05em">VICTORIAS CONSECUTIVAS VS BOTS</div>
+    <div id="RANK_LIST" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:5px">
+      <div style="color:rgba(232,220,200,.4);font-size:11px;text-align:center;padding:20px">Cargando...</div>
+    </div>
+    <div id="RANK_PAGES" style="display:flex;gap:8px;align-items:center;margin-top:2px"></div>
+    <button id="RANK_CLOSE" style="width:100%;max-width:320px;padding:10px;border-radius:8px;border:1px solid rgba(232,220,200,.3);background:transparent;color:rgba(232,220,200,.7);font-family:Cinzel,serif;font-size:11px;cursor:pointer;touch-action:manipulation;margin-top:4px">
+      ✕ Cerrar
+    </button>`;
+
+  $('G').appendChild(ov);
+
+  const closeBtn=ov.querySelector('#RANK_CLOSE');
+  closeBtn.addEventListener('click',()=>rmEl('RANKING_OV'));
+  closeBtn.addEventListener('touchend',e=>{e.preventDefault();rmEl('RANKING_OV');},{passive:false});
+
+  await rankingLoadPage(ov,1);
+}
+
+let _rankPage=1;
+const RANK_PER_PAGE=10;
+
+async function rankingLoadPage(ov,page){
+  _rankPage=page;
+  const listEl=ov.querySelector('#RANK_LIST');
+  const pagesEl=ov.querySelector('#RANK_PAGES');
+  listEl.innerHTML='<div style="color:rgba(232,220,200,.4);font-size:11px;text-align:center;padding:20px">Cargando...</div>';
+
+  try{
+    // Obtener total para paginación
+    const all=await sbFetch('/rest/v1/ranking?select=id&order=racha.desc');
+    const total=all?all.length:0;
+    const totalPages=Math.max(1,Math.ceil(total/RANK_PER_PAGE));
+    const offset=(page-1)*RANK_PER_PAGE;
+
+    const rows=await sbFetch('/rest/v1/ranking?select=*&order=racha.desc,created_at.asc&limit='+RANK_PER_PAGE+'&offset='+offset);
+
+    if(!rows||!rows.length){
+      listEl.innerHTML='<div style="color:rgba(232,220,200,.4);font-size:11px;text-align:center;padding:20px">Sin registros aún. ¡Sé el primero!</div>';
+      pagesEl.innerHTML='';
+      return;
+    }
+
+    const medals=['🥇','🥈','🥉'];
+    let html='';
+    rows.forEach((r,idx)=>{
+      const pos=offset+idx+1;
+      const medal=pos<=3?medals[pos-1]:`<span style="font-size:11px;color:rgba(232,220,200,.4);min-width:18px;display:inline-block">#${pos}</span>`;
+      const isTop3=pos<=3;
+      const bg=pos===1?'rgba(201,168,76,.12)':pos===2?'rgba(180,180,180,.08)':pos===3?'rgba(176,102,41,.08)':'rgba(255,255,255,.03)';
+      const border=pos===1?'rgba(201,168,76,.35)':pos===2?'rgba(180,180,180,.25)':pos===3?'rgba(176,102,41,.25)':'rgba(255,255,255,.07)';
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid ${border};background:${bg}">
+        <span style="font-size:${isTop3?'18':'13'}px;min-width:22px;text-align:center">${medal}</span>
+        <span style="font-size:13px">${r.bandera||'🌍'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:Cinzel,serif;font-size:11px;color:${isTop3?'var(--gold)':'rgba(232,220,200,.85)'};font-weight:${isTop3?700:400};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.nombre}</div>
+          <div style="font-size:9px;color:rgba(232,220,200,.35)">${r.fecha||''}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:Cinzel,serif;font-size:16px;color:${isTop3?'var(--gold)':'rgba(232,220,200,.7)'};font-weight:700">${r.racha}</div>
+          <div style="font-size:8px;color:rgba(232,220,200,.35)">victorias</div>
+        </div>
+      </div>`;
+    });
+    listEl.innerHTML=html;
+
+    // Paginación
+    if(totalPages>1){
+      let pHtml='';
+      const btnStyle=(active)=>`padding:5px 10px;border-radius:6px;border:1px solid rgba(201,168,76,${active?.5:.2});background:${active?'rgba(201,168,76,.15)':'transparent'};color:${active?'var(--gold)':'rgba(232,220,200,.45)'};font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation`;
+      if(page>1)pHtml+=`<button class="rank-page-btn" data-page="${page-1}" style="${btnStyle(false)}">‹ Ant</button>`;
+      // páginas numeradas (máximo 5 alrededor de la actual)
+      const start=Math.max(1,page-2);const end=Math.min(totalPages,page+2);
+      for(let p=start;p<=end;p++){
+        pHtml+=`<button class="rank-page-btn" data-page="${p}" style="${btnStyle(p===page)}">${p}</button>`;
+      }
+      if(page<totalPages)pHtml+=`<button class="rank-page-btn" data-page="${page+1}" style="${btnStyle(false)}">Sig ›</button>`;
+      pagesEl.innerHTML=pHtml;
+      pagesEl.querySelectorAll('.rank-page-btn').forEach(btn=>{
+        btn.addEventListener('click',()=>rankingLoadPage(ov,+btn.dataset.page));
+        btn.addEventListener('touchend',e=>{e.preventDefault();rankingLoadPage(ov,+btn.dataset.page);},{passive:false});
+      });
+    } else {
+      pagesEl.innerHTML='';
+    }
+  }catch(e){
+    listEl.innerHTML=`<div style="color:#E24B4A;font-size:10px;text-align:center;padding:10px">Error al cargar el ranking.<br>${e.message}</div>`;
+  }
+}
+
+// ── Mostrar pantalla final después del ranking ──
+function showFinalFull(){
+  // ya está mostrando showFinalOv, solo cerrar el overlay de entry
+}
+
+// ── Verificar y procesar racha al terminar partida solo ──
+async function procesarRachaSolo(ganoElJugador,esEmpate){
+  if(MP.mode!=='solo')return;
+
+  if(ganoElJugador&&!esEmpate){
+    rachaGano();
+    // mostrar mininotificación de racha actual
+    const r=rachaGet();
+    if(r.actual>=2){
+      // small toast
+      const toast=document.createElement('div');
+      toast.style.cssText='position:absolute;top:50px;left:50%;transform:translateX(-50%);background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.4);border-radius:8px;padding:6px 14px;font-family:Cinzel,serif;font-size:11px;color:var(--gold);z-index:901;white-space:nowrap;pointer-events:none';
+      toast.textContent='🔥 Racha: '+r.actual+' victorias seguidas';
+      $('G').appendChild(toast);
+      setTimeout(()=>toast.remove(),2500);
+    }
+  } else {
+    // perdió o empató: analizar racha
+    const rachaFinal=rachaPerdio();
+    if(rachaFinal>=2){
+      // verificar si califica para ranking
+      const califica=await rankingCalifica(rachaFinal);
+      if(califica){
+        // pequeña pausa para que el overlay de resultados aparezca primero
+        setTimeout(()=>showRankingEntry(rachaFinal),600);
+      }
+    }
+  }
 }
 
 // ── API SUPABASE ──
