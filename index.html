@@ -185,6 +185,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 }
 .golpe-ripple2{animation-delay:.15s !important}
 .golpe-ripple3{animation-delay:.3s !important}
+@keyframes challengePulse{0%,100%{transform:scale(1) rotate(-4deg)}50%{transform:scale(1.2) rotate(4deg)}}
 @keyframes penaltyIn{
   0%{transform:scale(0.1) rotate(10deg);opacity:0}
   45%{transform:scale(1.4) rotate(-3deg);opacity:1}
@@ -382,21 +383,68 @@ function isRun(cs){
 function validCombo(cs){return cs.length>=3&&(isGroup(cs)||isRun(cs));}
 function comboType(cs){return isGroup(cs)?'grupo':'escalera';}
 function canFit(comboCards,c,combo){
-  // verificar primero que forma combo válido
-  if(!validCombo([...comboCards,c]))return false;
-  // si hay Joker en el combo y conocemos su posición, verificar que
-  // la carta no tenga el mismo valor que el Joker ya representa
-  if(combo&&comboCards.some(x=>x.jk)){
-    const jkVal=getJokerValue(combo);
-    if(jkVal>0){
-      // calcular el valor efectivo de la carta (A puede ser 1 o 14)
-      const nonJ=comboCards.filter(x=>!x.jk);
-      const hasKing=nonJ.some(x=>x.n===13);
-      const cardVal=(c.n===1&&hasKing)?14:c.n;
-      if(cardVal===jkVal)return false; // esa posición ya está ocupada por el Joker
-    }
+  // Para grupos (mismo número): solo verificar que no esté ya el mismo palo
+  const nonJ=comboCards.filter(x=>!x.jk&&!x.wl);
+  if(isGroup(comboCards)){
+    // grupo: la carta debe tener mismo número, palo distinto
+    const n=nonJ[0]&&nonJ[0].n;
+    if(c.n!==n)return false;
+    if(comboCards.some(x=>x.s===c.s))return false;
+    return true;
   }
-  return true;
+
+  // Para escaleras: la carta SOLO puede entrar por los extremos del orden establecido
+  if(!combo)return validCombo([...comboCards,c]);
+
+  // Obtener el orden actual del combo (establecido por el jugador o calculado)
+  const ord=combo.order||sortCombo(combo);
+  if(!ord||ord.length<2)return validCombo([...comboCards,c]);
+
+  // Calcular el valor efectivo de cada posición en el orden
+  const hasAce=nonJ.some(x=>x.n===1);
+  const hasKing=nonJ.some(x=>x.n===13);
+  const hasHighC=nonJ.some(x=>x.n>=10&&x.n<=12);
+  const hasLowC=nonJ.some(x=>x.n>=2&&x.n<=5);
+  const aceAs14=(hasAce&&hasKing)||(hasAce&&hasHighC&&!hasKing);
+  const circularExtended=hasAce&&hasHighC&&!hasKing&&hasLowC;
+
+  const effectiveVal=card=>{
+    if(card.jk)return getJokerValue(combo);
+    if(card.wl)return -1;
+    if(aceAs14&&card.n===1)return 14;
+    if(circularExtended&&card.n>=2&&card.n<=5)return card.n+13;
+    return card.n;
+  };
+
+  const cardVal=(()=>{
+    if(aceAs14&&c.n===1)return 14;
+    return c.n;
+  })();
+
+  // Obtener valor del extremo izquierdo y derecho del orden actual
+  const leftCard=ord[0];
+  const rightCard=ord[ord.length-1];
+  const leftVal=effectiveVal(leftCard);
+  const rightVal=effectiveVal(rightCard);
+
+  // La carta nueva debe ser contigua a uno de los dos extremos
+  const fitsLeft=(leftVal>0)&&(cardVal===leftVal-1);
+  const fitsRight=(rightVal>0)&&(cardVal===rightVal+1);
+
+  // Caso circular: si el extremo derecho es A(14) o bajo extendido,
+  // también permitir que 2/3 encaje (solo si no hay ya ese valor)
+  const fitsCircular=(()=>{
+    // Si el extremo derecho es A(14 o 1), permitir 2 al lado
+    if(rightVal===14&&cardVal===2)return true;
+    // Si el extremo izquierdo tiene un valor circular (15,16), el siguiente puede venir
+    if(leftVal>=15&&cardVal===leftVal-1)return true;
+    return false;
+  })();
+
+  if(!fitsLeft&&!fitsRight&&!fitsCircular)return false;
+
+  // Doble verificación: el combo resultante sigue siendo válido
+  return validCombo([...comboCards,c]);
 }
 function hasBothWilds(hand){return hand.some(c=>c.jk)&&hand.some(c=>c.wl);}
 // Detecta si un jugador usó ambos comodines (en mano O en combos bajados)
@@ -788,6 +836,80 @@ function showBetScreen(){
   ov.innerHTML=`
     <div style="width:100%;max-width:340px;padding:20px 16px 0;display:flex;flex-direction:column;align-items:center;gap:12px;flex-shrink:0">
       <div style="font-family:Cinzel,serif;font-size:18px;color:var(--gold);letter-spacing:.1em;margin-top:4px">Apuesta</div>
+      ${MP.mode==='solo'?`<div id="CHALLENGE_BOX" style="position:relative;width:100%;overflow:hidden;border-radius:10px;border:1px solid rgba(226,75,74,.4);background:linear-gradient(135deg,rgba(40,10,10,.95),rgba(20,5,5,.98));padding:14px 12px 12px;text-align:center">
+        <!-- Humo SVG animado -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.55" viewBox="0 0 340 90" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <filter id="smblur"><feGaussianBlur stdDeviation="3.5"/></filter>
+            <!-- Partícula de humo 1 -->
+            <animateMotion id="am1"/>
+          </defs>
+          <!-- columnas de humo ascendente -->
+          <ellipse cx="30" cy="75" rx="10" ry="7" fill="rgba(200,60,40,.18)" filter="url(#smblur)">
+            <animate attributeName="cy" values="75;10;75" dur="3.2s" repeatCount="indefinite"/>
+            <animate attributeName="rx" values="10;20;10" dur="3.2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0.35;0" dur="3.2s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="80" cy="75" rx="8" ry="6" fill="rgba(180,50,30,.15)" filter="url(#smblur)">
+            <animate attributeName="cy" values="75;5;75" dur="2.8s" begin="0.5s" repeatCount="indefinite"/>
+            <animate attributeName="rx" values="8;18;8" dur="2.8s" begin="0.5s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0.3;0" dur="2.8s" begin="0.5s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="150" cy="80" rx="12" ry="8" fill="rgba(220,70,40,.2)" filter="url(#smblur)">
+            <animate attributeName="cy" values="80;8;80" dur="3.6s" begin="0.3s" repeatCount="indefinite"/>
+            <animate attributeName="rx" values="12;24;12" dur="3.6s" begin="0.3s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0.4;0" dur="3.6s" begin="0.3s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="220" cy="78" rx="9" ry="6" fill="rgba(190,55,35,.15)" filter="url(#smblur)">
+            <animate attributeName="cy" values="78;6;78" dur="3s" begin="1s" repeatCount="indefinite"/>
+            <animate attributeName="rx" values="9;19;9" dur="3s" begin="1s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0.28;0" dur="3s" begin="1s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="290" cy="76" rx="11" ry="7" fill="rgba(210,65,40,.18)" filter="url(#smblur)">
+            <animate attributeName="cy" values="76;12;76" dur="3.4s" begin="0.7s" repeatCount="indefinite"/>
+            <animate attributeName="rx" values="11;22;11" dur="3.4s" begin="0.7s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0.32;0" dur="3.4s" begin="0.7s" repeatCount="indefinite"/>
+          </ellipse>
+          <ellipse cx="320" cy="80" rx="7" ry="5" fill="rgba(170,45,25,.12)" filter="url(#smblur)">
+            <animate attributeName="cy" values="80;15;80" dur="2.6s" begin="1.4s" repeatCount="indefinite"/>
+            <animate attributeName="rx" values="7;16;7" dur="2.6s" begin="1.4s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0;0.25;0" dur="2.6s" begin="1.4s" repeatCount="indefinite"/>
+          </ellipse>
+          <!-- brasas/chispas -->
+          <circle cx="60" cy="70" r="2" fill="rgba(255,120,40,.7)">
+            <animate attributeName="cy" values="70;20;70" dur="2s" begin="0.2s" repeatCount="indefinite"/>
+            <animate attributeName="cx" values="60;75;60" dur="2s" begin="0.2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.7;0;0.7" dur="2s" begin="0.2s" repeatCount="indefinite"/>
+            <animate attributeName="r" values="2;0.5;2" dur="2s" begin="0.2s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="200" cy="72" r="1.5" fill="rgba(255,180,40,.8)">
+            <animate attributeName="cy" values="72;18;72" dur="1.8s" begin="0.9s" repeatCount="indefinite"/>
+            <animate attributeName="cx" values="200;185;200" dur="1.8s" begin="0.9s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.8;0;0.8" dur="1.8s" begin="0.9s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="270" cy="68" r="1.8" fill="rgba(255,100,30,.75)">
+            <animate attributeName="cy" values="68;22;68" dur="2.2s" begin="0.4s" repeatCount="indefinite"/>
+            <animate attributeName="cx" values="270;258;270" dur="2.2s" begin="0.4s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.75;0;0.75" dur="2.2s" begin="0.4s" repeatCount="indefinite"/>
+          </circle>
+        </svg>
+        <!-- Texto desafiante -->
+        <div style="position:relative;z-index:2">
+          <div style="font-size:22px;margin-bottom:4px;
+            animation:challengePulse 2s ease-in-out infinite">😤🔥</div>
+          <div style="font-family:Cinzel,serif;font-size:11px;color:rgba(255,160,140,.95);line-height:1.6;font-weight:700;letter-spacing:.03em">
+            ¿Creés que podés ganarme<br>más de
+            <span style="color:#ff6b4a;font-size:14px;text-shadow:0 0 8px rgba(255,100,50,.8)">2 veces seguidas</span>?
+          </div>
+          <div style="font-family:Cinzel,serif;font-size:12px;color:rgba(255,100,60,.9);margin-top:3px;font-weight:700;
+            text-shadow:0 0 10px rgba(255,80,40,.5);letter-spacing:.05em">
+            ¡¡INTÉNTALO!!
+          </div>
+          <div style="font-size:9px;color:rgba(232,220,200,.4);margin-top:5px;font-style:italic;letter-spacing:.04em">
+            Solo los mejores llegan al ranking
+          </div>
+        </div>
+      </div>`:''}
       <div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center">Elegí el valor de la ficha para esta partida.</div>
       <div id="CHIP_ROW" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"></div>
       <div id="BET_INFO" style="font-family:Cinzel,serif;font-size:13px;color:rgba(232,220,200,.4)">Seleccioná una ficha</div>
