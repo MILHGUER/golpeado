@@ -335,7 +335,7 @@ function isRun(cs){
     if(hasBajos){
       const wrapped2=baseNums.map(n=>{
         if(n===1)return 14;
-        if(n>=2&&n<=12)return n+13;
+        if(n>=2&&n<=9)return n+13; // solo bajas reales
         return n;
       });
       if(gapsFor(wrapped2)<=jks)return true;
@@ -429,14 +429,14 @@ function canFit(comboCards,c,combo){
   const hasHighC=nonJ.some(x=>x.n>=10&&x.n<=12);
   const hasLowC=nonJ.some(x=>x.n>=2&&x.n<=5);
   const aceAs14=(hasAce&&hasKing)||(hasAce&&hasHighC&&!hasKing);
-  const hasLowC2=nonJ.some(x=>x.n>=2&&x.n<=12); // cualquier número bajo
+  const hasLowC2=nonJ.some(x=>x.n>=2&&x.n<=9); // cartas bajas reales (2-9)
   const circularExtended=hasAce&&hasHighC&&!hasKing&&hasLowC2;
 
   const effectiveVal=card=>{
     if(card.jk)return getJokerValue(combo);
     if(card.wl)return -1;
     if(aceAs14&&card.n===1)return 14;
-    if(circularExtended&&card.n>=2&&card.n<=12)return card.n+13;
+    if(circularExtended&&card.n>=2&&card.n<=9)return card.n+13;
     return card.n;
   };
 
@@ -454,9 +454,9 @@ function canFit(comboCards,c,combo){
   if(c.n===1){
     cardVals.push(1);   // A como inicio de escalera
     cardVals.push(14);  // A como final de escalera (tras K o circular)
-  } else if(c.n>=2&&c.n<=12){
+  } else if(c.n>=2&&c.n<=9){
     cardVals.push(c.n);          // valor normal
-    cardVals.push(c.n+13);       // valor circular extendido (2→15,...,12→25)
+    cardVals.push(c.n+13);       // valor circular extendido (2→15,...,9→22)
   } else {
     cardVals.push(c.n);
   }
@@ -587,7 +587,7 @@ function sortCombo(combo){
   // detecta automáticamente si la escalera es circular (K,A,2 o K,A,2,3)
   const hasHighCard=nonJokers.some(c=>c.n>=10&&c.n<=12); // J,Q sin K
   // Detectar si hay bajos (2,3,4,5) en combinación con altos y A (escalera circular extendida)
-  const hasLowAndHigh=hasAce&&hasHighCard&&!hasKing&&nonJokers.some(c=>c.n>=2&&c.n<=12);
+  const hasLowAndHigh=hasAce&&hasHighCard&&!hasKing&&nonJokers.some(c=>c.n>=2&&c.n<=9); // bajas=2-9, no J,Q
   const sortVal=c=>{
     if(c.jk)return -1; // placeholder, se reemplaza abajo
     if(hasAce&&hasKing&&hasLow){
@@ -601,10 +601,11 @@ function sortCombo(combo){
       return c.n===1?14:c.n;
     }
     if(hasLowAndHigh){
-      // J,Q,Joker(K),A,2,3,... — escalera circular extendida sin límite
+      // J,Q,Joker(K),A,2,3,... — escalera circular extendida
+      // Solo las cartas genuinamente bajas (2-9) van al espacio circular
       if(c.n===1)return 14;
-      if(c.n>=2&&c.n<=12)return c.n+13; // 2→15,...,12→25
-      return c.n;
+      if(c.n>=2&&c.n<=9)return c.n+13; // 2→15,...,9→22
+      return c.n; // J(11),Q(12) mantienen su valor natural
     }
     if(hasAce&&hasHighCard&&!hasKing){
       // J,Q,Joker(K),A — As al final como 14
