@@ -2898,7 +2898,26 @@ function showFinalOv(){
   const payments=calcPayments(winners,adj,tie,gp,gWon);
 
   const title=tie?'¡Empate!':(winners[0]===0?'¡GANASTE!':'¡'+PNAME(winners[0])+' gana!');
-  let note=tie?'Nadie gana en empate.':gWon?PNAME(gp)+' ganó declarando GOLPEADO.':gp>=0&&!gWon?PNAME(gp)+' declaró GOLPEADO pero no ganó — paga doble.':'';
+
+  // Nota principal — explicación detallada del resultado
+  let note='';
+  if(tie){
+    note='Nadie gana en empate.';
+  } else if(gWon){
+    note=`${PNAME(gp)} ganó declarando GOLPEADO con ${adj[gp]} pts — el menor puntaje.`;
+  } else if(gp>=0&&!gWon){
+    const ganadorNombre=PNAME(winners[0]);
+    const ganadorPts=adj[winners[0]];
+    const golpeadorPts=adj[gp];
+    const tieneComodinesGolpeador=usedBothWilds(gp);
+    let razones=[];
+    if(golpeadorPts>ganadorPts)razones.push(`tenía ${golpeadorPts} pts contra ${ganadorPts} pts de ${ganadorNombre}`);
+    if(tieneComodinesGolpeador)razones.push(`usó ambos comodines (+60 pts de penalización)`);
+    note=`${PNAME(gp)} declaró GOLPEADO pero no ganó — ${razones.join(' y ')}. Gana ${ganadorNombre} con ${ganadorPts} pts.`;
+  } else {
+    // Nadie golpeó — explicar quién ganó y por qué
+    note=`${PNAME(winners[0])} gana con el menor puntaje: ${adj[winners[0]]} pts.`;
+  }
 
   // tabla de resultados
   const rows=scores.map((sc,i)=>{
@@ -2912,29 +2931,52 @@ function showFinalOv(){
     </tr>`;
   }).join('');
 
-  // sección de penalizaciones explicadas
+  // sección de penalizaciones con explicación detallada
   let penResumen='';
   const penItems=[];
   for(let i=0;i<S.np;i++){
-    // En empate no hay penalizaciones que se apliquen (nadie paga)
-    const golpoSinGanar=gp===i&&!gWon&&!tie;
-    const usaComodines=usedBothWilds(i)&&!tie;
-    if(golpoSinGanar)penItems.push({name:PNAME(i),color:PCOLOR[i],motivo:'Declaró GOLPEADO pero no ganó',icon:'👊'});
-    else if(usaComodines)penItems.push({name:PNAME(i),color:PCOLOR[i],motivo:'Usó los 2 comodines (★ Joker + ✦ Grupal)',icon:'⚠️'});
+    if(tie)continue; // en empate no hay penalizaciones
+    const golpoSinGanar=gp===i&&!gWon;
+    const tieneComodines=usedBothWilds(i);
+    if(golpoSinGanar||tieneComodines){
+      // Construir explicación detallada
+      const lineas=[];
+
+      if(golpoSinGanar&&tieneComodines){
+        // Doble motivo: golpeó sin ganar Y tiene comodines
+        const ganadorNombre=PNAME(winners[0]);
+        const ganadorPts=adj[winners[0]];
+        lineas.push(`Declaró GOLPEADO con <strong>${adj[i]} pts</strong> pero ${ganadorNombre} tenía menos: <strong>${ganadorPts} pts</strong>.`);
+        lineas.push(`Además usó ambos comodines (★ Joker + ✦ Grupal) que suman <strong>+60 pts</strong> de penalización.`);
+        lineas.push(`<strong style="color:#E24B4A">Paga el doble por ambas razones.</strong>`);
+      } else if(golpoSinGanar){
+        const ganadorNombre=PNAME(winners[0]);
+        const ganadorPts=adj[winners[0]];
+        lineas.push(`Declaró GOLPEADO con <strong>${adj[i]} pts</strong>.`);
+        lineas.push(`No ganó porque ${ganadorNombre} tenía menos puntos: <strong>${ganadorPts} pts</strong>.`);
+        lineas.push(`<strong style="color:#E24B4A">Paga el doble de la apuesta.</strong>`);
+      } else if(tieneComodines){
+        lineas.push(`Usó ambos comodines (★ Joker + ✦ Grupal) en la misma partida.`);
+        lineas.push(`Se suman <strong>+60 pts</strong> de penalización a su puntaje final (${scores[i]} + 60 = <strong>${adj[i]} pts</strong>).`);
+        lineas.push(`<strong style="color:#E24B4A">Paga el doble de la apuesta.</strong>`);
+      }
+
+      penItems.push({name:PNAME(i),color:PCOLOR[i],icon:golpoSinGanar?'👊':'⚠️',lineas});
+    }
   }
   if(penItems.length){
     penResumen=`<div style="width:100%;max-width:300px;border:1px solid rgba(226,75,74,.35);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:rgba(226,75,74,.07)">
       <div style="font-family:Cinzel,serif;font-size:9px;color:#E24B4A;margin-bottom:8px;letter-spacing:.05em">⚠️ PENALIZACIONES</div>`;
-    penItems.forEach(p=>{
-      penResumen+=`<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;font-size:10px;padding-bottom:6px;border-bottom:1px solid rgba(226,75,74,.15)">
-        <span style="font-size:14px">${p.icon}</span>
+    penItems.forEach((p,pi)=>{
+      const isLast=pi===penItems.length-1;
+      penResumen+=`<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:${isLast?0:8}px;font-size:10px;padding-bottom:${isLast?0:8}px;border-bottom:${isLast?'none':'1px solid rgba(226,75,74,.15)'}">
+        <span style="font-size:16px;flex-shrink:0">${p.icon}</span>
         <div>
-          <div style="color:${p.color};font-weight:700;margin-bottom:2px">${p.name}</div>
-          <div style="color:rgba(232,220,200,.7);font-size:9px">${p.motivo} — <strong style="color:#E24B4A">paga el doble</strong></div>
+          <div style="color:${p.color};font-weight:700;margin-bottom:4px;font-family:Cinzel,serif;font-size:10px">${p.name}</div>
+          ${p.lineas.map(l=>`<div style="color:rgba(232,220,200,.75);font-size:9px;line-height:1.5;margin-bottom:2px">${l}</div>`).join('')}
         </div>
       </div>`;
     });
-    penResumen=penResumen.replace(/border-bottom:1px solid rgba\(226,75,74,\.15\)"><\/div>\s*$/, 'border-bottom:none"></div>');
     penResumen+=`</div>`;
   }
 
