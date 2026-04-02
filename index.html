@@ -3326,12 +3326,22 @@ async function rankingGetTop(limit=10){
 
 // Verificar si una racha entra al ranking (top 10 o supera record propio)
 async function rankingCalifica(racha){
-  if(racha<2)return false; // mínimo 2 victorias seguidas para aparecer
+  if(racha<2)return false; // mínimo 2 victorias seguidas
   try{
     const top=await rankingGetTop(10);
-    if(top.length<10)return true; // hay espacio
-    const min=top[top.length-1].racha;
-    return racha>min;
+
+    // Si el ranking está vacío → califica si tiene ≥2
+    if(!top||!top.length)return racha>=2;
+
+    const maxRacha=top[0].racha; // el récord más alto actual
+
+    // Solo califica si SUPERA el récord actual del #1
+    // Si empata con el #1 NO califica (ya alguien lo tiene)
+    if(racha<=maxRacha)return false;
+
+    // Si el ranking tiene menos de 10, puede entrar si supera al #1
+    // Si tiene 10, también debe superar al #1 (para desplazarlo)
+    return true;
   }catch(e){return false;}
 }
 
@@ -3561,10 +3571,9 @@ async function procesarRachaSolo(ganoElJugador,esEmpate){
     // perdió o empató: analizar racha
     const rachaFinal=rachaPerdio();
     if(rachaFinal>=2){
-      // verificar si califica para ranking
+      // verificar si califica para ranking (debe superar el récord actual del #1)
       const califica=await rankingCalifica(rachaFinal);
       if(califica){
-        // pequeña pausa para que el overlay de resultados aparezca primero
         setTimeout(()=>showRankingEntry(rachaFinal),600);
       }
     }
