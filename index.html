@@ -1957,12 +1957,11 @@ function botEncajarEnMesa(pid){
       // primero intentar en combos propios
       const ownFit=S.shown[pid].find(c=>canFit(c.cards,card,c));
       if(ownFit){
-        // Usar doFitCard lógica para preservar el order si tiene Joker
+        card._fittedBy=pid;
         if(ownFit.order&&ownFit.cards.some(c=>c.jk)){
           ownFit.cards.push(card);
-          // insertar en extremo correcto
           const ord=ownFit.order;
-          ownFit.order=[...ord,card]; // al final por defecto para bots
+          ownFit.order=[...ord,card];
         } else {
           ownFit.cards.push(card);ownFit.order=null;
         }
@@ -1973,6 +1972,7 @@ function botEncajarEnMesa(pid){
       if(Math.random()<0.7){
         const otherFit=S.shown.flat().filter(c=>!S.shown[pid].includes(c)).find(c=>canFit(c.cards,card,c));
         if(otherFit){
+          card._fittedBy=pid;
           otherFit.cards.push(card);otherFit.order=null;
           S.hands[pid]=rmIds(S.hands[pid],[card.id]);
           changed=true;break;
@@ -2247,6 +2247,7 @@ function revealEncajar(){
 function doFitCard(card,combo){
   S.hands[0]=rmIds(S.hands[0],[card.id]);
   S._revSel.delete(card.id);
+  card._fittedBy=0; // marcar quién encajó esta carta
   sndCard(0.4);
   if(card.jk){
     // Joker: agregar al inicio por defecto para que el jugador elija moverlo al final si prefiere
@@ -2650,6 +2651,17 @@ function drawCenter(){
       const inRevealPhase=S.phase==='golpeado_reveal'||S.phase==='mesa_final';
       ordered.forEach((c,cardIdx)=>{
         const ce=mkFace(c,false);
+        // Etiqueta del jugador que encajó esta carta
+        if(c._fittedBy!==undefined){
+          const labelEl=document.createElement('div');
+          const nombre=PNAME(c._fittedBy);
+          // Opacidad más alta si la encajó alguien diferente al dueño del combo
+          const alpha=c._fittedBy!==pi?'dd':'99';
+          labelEl.style.cssText=`position:absolute;bottom:1px;left:0;right:0;background:${PCOLOR[c._fittedBy]}${alpha};color:#1a1230;font-size:6px;font-family:Cinzel,serif;font-weight:700;text-align:center;padding:1px 2px;border-radius:0 0 3px 3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;letter-spacing:.02em;z-index:3;pointer-events:none`;
+          labelEl.textContent=nombre;
+          ce.style.position='relative';
+          ce.appendChild(labelEl);
+        }
         // Joker draggable: en combos propios O en combos ajenos si el Joker pertenece al jugador 0
         // Solo si está en un extremo (primer o último lugar en el orden)
         const jokerEnExtremo=c.jk&&(cardIdx===0||cardIdx===ordered.length-1);
