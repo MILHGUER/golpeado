@@ -1958,13 +1958,8 @@ function botEncajarEnMesa(pid){
       const ownFit=S.shown[pid].find(c=>canFit(c.cards,card,c));
       if(ownFit){
         card._fittedBy=pid;
-        if(ownFit.order&&ownFit.cards.some(c=>c.jk)){
-          ownFit.cards.push(card);
-          const ord=ownFit.order;
-          ownFit.order=[...ord,card];
-        } else {
-          ownFit.cards.push(card);ownFit.order=null;
-        }
+        ownFit.cards.push(card);
+        insertarEnExtremo(card,ownFit);
         S.hands[pid]=rmIds(S.hands[pid],[card.id]);
         changed=true;break;
       }
@@ -1973,7 +1968,8 @@ function botEncajarEnMesa(pid){
         const otherFit=S.shown.flat().filter(c=>!S.shown[pid].includes(c)).find(c=>canFit(c.cards,card,c));
         if(otherFit){
           card._fittedBy=pid;
-          otherFit.cards.push(card);otherFit.order=null;
+          otherFit.cards.push(card);
+          insertarEnExtremo(card,otherFit);
           S.hands[pid]=rmIds(S.hands[pid],[card.id]);
           changed=true;break;
         }
@@ -2243,6 +2239,36 @@ function revealEncajar(){
   redraw();
 }
 
+// Inserta una carta en el extremo correcto de un combo preservando el order
+function insertarEnExtremo(card,combo){
+  if(!combo.order){combo.order=null;return;}
+  const ord=combo.order;
+  const nonJ=combo.cards.filter(x=>!x.jk&&!x.wl&&x.id!==card.id);
+  const hasAce=nonJ.some(x=>x.n===1);
+  const hasKing=nonJ.some(x=>x.n===13);
+  const aceAs14=hasAce&&hasKing;
+  const cardVal=(aceAs14&&card.n===1)?14:card.n;
+  const getVal=c=>{
+    if(c.jk)return getJokerValue(combo);
+    if(c.wl)return -1;
+    if(aceAs14&&c.n===1)return 14;
+    if(c.n>=2&&c.n<=12&&hasKing&&hasAce)return c.n+13;
+    return c.n;
+  };
+  const leftVal=getVal(ord[0]);
+  const rightVal=getVal(ord[ord.length-1]);
+  const circVal=card.n>=2&&card.n<=12?card.n+13:null;
+  if((rightVal>0&&cardVal===rightVal+1)||(circVal&&rightVal>0&&circVal===rightVal+1)){
+    combo.order=[...ord,card]; // al final
+  } else if(leftVal>0&&cardVal===leftVal-1){
+    combo.order=[card,...ord]; // al inicio
+  } else if(card.n===13&&hasAce&&!hasKing){
+    combo.order=[card,...ord]; // K antes del A circular
+  } else {
+    combo.order=null; // sortCombo recalcula
+  }
+}
+
 // encaja una carta en un combo específico
 function doFitCard(card,combo){
   S.hands[0]=rmIds(S.hands[0],[card.id]);
@@ -2262,38 +2288,7 @@ function doFitCard(card,combo){
     combo._jokerOwner=0; // slot del jugador que encajó el Joker
   } else {
     combo.cards.push(card);
-    // Si el combo ya tiene un order establecido (ej: Joker en extremo),
-    // preservarlo insertando la carta nueva en el extremo correcto
-    if(combo.order){
-      const ord=combo.order;
-      const nonJ=combo.cards.filter(x=>!x.jk&&!x.wl&&x.id!==card.id);
-      const hasAce=nonJ.some(x=>x.n===1);
-      const hasKing=nonJ.some(x=>x.n===13);
-      const aceAs14=(hasAce&&hasKing);
-      const cardVal=(aceAs14&&card.n===1)?14:card.n;
-      // Calcular valor del extremo izquierdo y derecho
-      const getVal=c=>{
-        if(c.jk)return getJokerValue(combo);
-        if(aceAs14&&c.n===1)return 14;
-        if(c.n>=2&&c.n<=12&&hasKing&&hasAce)return c.n+13; // espacio circular
-        return c.n;
-      };
-      const leftVal=getVal(ord[0]);
-      const rightVal=getVal(ord[ord.length-1]);
-      // Insertar en el extremo que corresponde
-      const circVal=card.n>=2&&card.n<=12?card.n+13:null;
-      if((rightVal>0&&cardVal===rightVal+1)||(circVal&&rightVal>0&&circVal===rightVal+1)){
-        combo.order=[...ord,card]; // al final
-      } else if(leftVal>0&&cardVal===leftVal-1){
-        combo.order=[card,...ord]; // al inicio
-      } else if(card.n===13&&hasAce&&!hasKing){
-        combo.order=[card,...ord]; // K antes del A
-      } else {
-        combo.order=null; // dejar que sortCombo recalcule si no es claro
-      }
-    } else {
-      combo.order=null;
-    }
+    insertarEnExtremo(card,combo);
   }
 }
 
