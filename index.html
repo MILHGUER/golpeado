@@ -314,25 +314,28 @@ function isRun(cs){
     if(gapsFor(with14)<=jks)return true;
   }
 
-  // intento 3: circular con A explícito — Q,K,A,2 / K,A,2 / K,A,2,3
+  // intento 3: circular con A explícito — K,A,2,3,...,N sin límite
   if(baseNums.includes(1)&&baseNums.includes(13)){
+    // Todos los números bajos (2+) van al espacio circular (n+13) sin límite fijo
     const wrapped=baseNums.map(n=>{
       if(n===1)return 14;
-      if(n<=4&&baseNums.includes(13))return n+13; // 2→15, 3→16, 4→17
+      if(n>=2&&n<=12)return n+13; // 2→15, 3→16, ..., 12→25 (pero solo los presentes)
       return n;
     });
     if(gapsFor(wrapped)<=jks)return true;
+    // También intentar sin mapear los números que están en la parte baja de la secuencia
+    // para detectar si son continuos con los altos (ej: 10,11,12,13,1,2,3)
+    const wrapped2=baseNums.map(n=>(n===1)?14:n);
+    if(gapsFor(wrapped2)<=jks)return true;
   }
 
-  // intento 3b: circular sin As explícito pero con secuencia alta-baja
-  // ej: Q,K + bajos (A=1 sería intento 3), o simplemente Q,K con wrap implícito
+  // intento 3b: circular con K y bajos sin A explícito
   if(baseNums.includes(13)){
-    // probar si alguna combinación con 1=14 y bajos como 15,16 funciona
-    const hasBajos=baseNums.some(n=>n>=1&&n<=4);
+    const hasBajos=baseNums.some(n=>n>=1&&n<=12);
     if(hasBajos){
       const wrapped2=baseNums.map(n=>{
         if(n===1)return 14;
-        if(n<=4)return n+13;
+        if(n>=2&&n<=12)return n+13;
         return n;
       });
       if(gapsFor(wrapped2)<=jks)return true;
@@ -426,13 +429,14 @@ function canFit(comboCards,c,combo){
   const hasHighC=nonJ.some(x=>x.n>=10&&x.n<=12);
   const hasLowC=nonJ.some(x=>x.n>=2&&x.n<=5);
   const aceAs14=(hasAce&&hasKing)||(hasAce&&hasHighC&&!hasKing);
-  const circularExtended=hasAce&&hasHighC&&!hasKing&&hasLowC;
+  const hasLowC2=nonJ.some(x=>x.n>=2&&x.n<=12); // cualquier número bajo
+  const circularExtended=hasAce&&hasHighC&&!hasKing&&hasLowC2;
 
   const effectiveVal=card=>{
     if(card.jk)return getJokerValue(combo);
     if(card.wl)return -1;
     if(aceAs14&&card.n===1)return 14;
-    if(circularExtended&&card.n>=2&&card.n<=5)return card.n+13;
+    if(circularExtended&&card.n>=2&&card.n<=12)return card.n+13;
     return card.n;
   };
 
@@ -450,9 +454,9 @@ function canFit(comboCards,c,combo){
   if(c.n===1){
     cardVals.push(1);   // A como inicio de escalera
     cardVals.push(14);  // A como final de escalera (tras K o circular)
-  } else if(c.n>=2&&c.n<=5){
-    cardVals.push(c.n);
-    cardVals.push(c.n+13); // valor circular extendido
+  } else if(c.n>=2&&c.n<=12){
+    cardVals.push(c.n);          // valor normal
+    cardVals.push(c.n+13);       // valor circular extendido (2→15,...,12→25)
   } else {
     cardVals.push(c.n);
   }
@@ -583,13 +587,13 @@ function sortCombo(combo){
   // detecta automáticamente si la escalera es circular (K,A,2 o K,A,2,3)
   const hasHighCard=nonJokers.some(c=>c.n>=10&&c.n<=12); // J,Q sin K
   // Detectar si hay bajos (2,3,4,5) en combinación con altos y A (escalera circular extendida)
-  const hasLowAndHigh=hasAce&&hasHighCard&&!hasKing&&nonJokers.some(c=>c.n>=2&&c.n<=5);
+  const hasLowAndHigh=hasAce&&hasHighCard&&!hasKing&&nonJokers.some(c=>c.n>=2&&c.n<=12);
   const sortVal=c=>{
     if(c.jk)return -1; // placeholder, se reemplaza abajo
     if(hasAce&&hasKing&&hasLow){
-      // escalera circular: K=13, A=14, 2=15, 3=16...
+      // escalera circular: K=13, A=14, 2=15, 3=16,... sin límite
       if(c.n===1)return 14;
-      if(c.n<=5)return c.n+13; // 2→15, 3→16, 4→17, 5→18
+      if(c.n>=2&&c.n<=12)return c.n+13; // 2→15,...,12→25
       return c.n;
     }
     if(hasAce&&hasKing){
@@ -597,10 +601,9 @@ function sortCombo(combo){
       return c.n===1?14:c.n;
     }
     if(hasLowAndHigh){
-      // J,Q,Joker(K),A,2,3 — escalera circular extendida
-      // Orden: J(11),Q(12),Joker(13),A(14),2(15),3(16)
+      // J,Q,Joker(K),A,2,3,... — escalera circular extendida sin límite
       if(c.n===1)return 14;
-      if(c.n>=2&&c.n<=5)return c.n+13; // 2→15, 3→16, 4→17
+      if(c.n>=2&&c.n<=12)return c.n+13; // 2→15,...,12→25
       return c.n;
     }
     if(hasAce&&hasHighCard&&!hasKing){
