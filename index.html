@@ -496,8 +496,11 @@ function hasBothWilds(hand){return hand.some(c=>c.jk)&&hand.some(c=>c.wl);}
 function usedBothWilds(i){
   try{
     const handCards=S.hands[i]||[];
+    // Buscar en combos propios
     const shownCards=(S.shown[i]||[]).flatMap(combo=>(combo&&combo.cards)||[]);
-    const all=[...handCards,...shownCards];
+    // También buscar en combos de OTROS jugadores (el jugador puede haber encajado sus comodines ahí)
+    const otherShownCards=S.shown.flatMap((shown,j)=>j===i?[]:(shown||[]).flatMap(combo=>(combo&&combo.cards)||[]));
+    const all=[...handCards,...shownCards,...otherShownCards];
     return all.some(c=>c&&c.jk)&&all.some(c=>c&&c.wl);
   }catch(e){return false;}
 }
@@ -697,12 +700,21 @@ function getJokerValue(combo){
 function tryJokerMove(combo,fromIdx,toIdx){
   if(fromIdx===toIdx)return;
   const ord=combo.order?[...combo.order]:[...sortCombo(combo)];
+  // El Joker solo puede ir a los extremos (posición 0 o última)
+  // Si el destino es el medio, rechazar
+  const newLen=ord.length; // el largo no cambia al mover
+  const esExtremo=(toIdx===0||toIdx===newLen-1);
+  if(!esExtremo){
+    S.msg='El Joker solo puede ir al inicio o al final del combo.';
+    redraw();return;
+  }
   const newOrd=[...ord];
   const[joker]=newOrd.splice(fromIdx,1);
   newOrd.splice(toIdx,0,joker);
   if(isJokerPosValid(newOrd,toIdx)){
     combo.order=newOrd;
     sndCard(0.3);
+    S.msg='';
   } else {
     S.msg='El Joker no puede ir ahí — no formaría una secuencia válida.';
   }
@@ -2547,10 +2559,18 @@ function drawCenter(){
       const inRevealPhase=S.phase==='golpeado_reveal'||S.phase==='mesa_final';
       ordered.forEach((c,cardIdx)=>{
         const ce=mkFace(c,false);
-        // Joker draggable en combos propios (durante juego normal Y fases de revelación)
-        if(c.jk&&pi===0&&!S.over){
+        // Joker draggable: en combos propios O en combos ajenos si el Joker pertenece al jugador 0
+        // Solo si está en un extremo (primer o último lugar en el orden)
+        const jokerEsDelJugador=c.jk&&!S.over&&(pi===0||(()=>{
+          // verificar si este Joker fue encajado por el jugador 0 buscando su ID en combos propios no... 
+          // simplificación: permitir drag si el jugador 0 tiene un Joker encajado en este combo
+          return false; // por ahora solo combos propios + extremo
+        })());
+        const jokerEnExtremo=c.jk&&(cardIdx===0||cardIdx===ordered.length-1);
+        if(c.jk&&pi===0&&!S.over&&jokerEnExtremo){
           ce.style.cursor='grab';ce.draggable=true;
-          ce.title='Arrastrá el Joker para cambiar su posición';
+          ce.title='Arrastrá el Joker al otro extremo para cambiar su valor';
+          ce.style.outline='1px dashed rgba(201,168,76,.5)'; // indicar que es draggable
           ce.addEventListener('dragstart',ev=>{ev.dataTransfer.setData('jokerCombo',`${pi},${ci},${cardIdx}`);ev.dataTransfer.effectAllowed='move';});
           let jtx=0,jty=0,jGhost=null;
           ce.addEventListener('touchstart',ev=>{jtx=ev.touches[0].clientX;jty=ev.touches[0].clientY;},{passive:true});
@@ -2580,6 +2600,11 @@ function drawCenter(){
               tryJokerMove(combo,cardIdx,parseInt(tg.dataset.jdrop));
             }
           },{passive:true});
+        }
+        // Si el Joker está en el medio, no es draggable pero mostrar tooltip
+        if(c.jk&&pi===0&&!S.over&&!jokerEnExtremo){
+          ce.title='El Joker está en el medio — no se puede mover';
+          ce.style.cursor='not-allowed';
         }
         // drop zone para Joker drag (combos propios)
         if(pi===0&&!S.over){
