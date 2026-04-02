@@ -409,6 +409,13 @@ function canFit(comboCards,c,combo){
   // Para escaleras: la carta SOLO puede entrar por los extremos del orden establecido
   if(!combo)return validCombo([...comboCards,c]);
 
+  // ── Joker (★) en escalera ──
+  // Puede encajar en cualquier extremo siempre que no haya ya un Joker en el combo
+  if(c.jk){
+    if(comboCards.some(x=>x.jk))return false; // ya hay un Joker
+    return validCombo([...comboCards,c]);      // verificar que sigue siendo escalera válida
+  }
+
   // Obtener el orden actual del combo (establecido por el jugador o calculado)
   const ord=combo.order||sortCombo(combo);
   if(!ord||ord.length<2)return validCombo([...comboCards,c]);
@@ -436,23 +443,47 @@ function canFit(comboCards,c,combo){
   const rightVal=effectiveVal(rightCard);
 
   // El valor de la carta entrante puede ser múltiple:
-  // El As puede valer 1 (inicio) o 14 (final tras K), según dónde encaje
+  // El As puede valer 1 (inicio) o 14 (final tras K o circular)
+  // K(13) también puede ir como 13 normal O si el extremo es Joker que representa
+  // un valor al que K es adyacente
   const cardVals=[];
   if(c.n===1){
     cardVals.push(1);   // A como inicio de escalera
     cardVals.push(14);  // A como final de escalera (tras K o circular)
   } else if(c.n>=2&&c.n<=5){
-    cardVals.push(c.n);        // valor normal
-    cardVals.push(c.n+13);     // valor circular extendido (2→15, etc.)
+    cardVals.push(c.n);
+    cardVals.push(c.n+13); // valor circular extendido
   } else {
     cardVals.push(c.n);
   }
+
+  // Si el extremo es el Joker, calcular también qué valor representaría
+  // si la carta entrante desplaza el Joker al otro extremo
+  // Ej: [A,2,Joker(=3)] + K → si K va al inicio, el orden sería [K,A,2,Joker(=3)] ← no válido
+  // Pero si el combo puede reordenarse como [Joker(=K),A,2] entonces K no tiene cabida
+  // Solo permitimos entrar por los extremos ACTUALES del orden
+  // EXCEPCIÓN: si el extremo es el Joker y la carta puede ser el valor "exterior"
+  // ej: [A,2,Joker(=3)] → extremo derecho=Joker(3). ¿Puede entrar el 4? sí (3+1=4)
+  // ej: [A,2,Joker(=3)] → extremo derecho=Joker(3). ¿Puede entrar K(13)? No, 13≠3+1
+  // Pero para [A,2,Joker], el Joker representa 3, no K. K no puede entrar aquí.
+  // Si querés K,A,2 → el jugador debe reordenar el Joker primero.
 
   // La carta nueva debe ser contigua a uno de los dos extremos con alguno de sus valores
   let fits=false;
   for(const cv of cardVals){
     if(leftVal>0&&cv===leftVal-1){fits=true;break;}
     if(rightVal>0&&cv===rightVal+1){fits=true;break;}
+  }
+
+  // Caso especial circular: K(13) puede ir antes del A(1) aunque leftVal=1
+  // porque K→A→... es escalera circular válida
+  if(!fits&&c.n===13&&hasAce&&!hasKing){
+    fits=true; // dejar que validCombo decida
+  }
+
+  // Caso especial circular: A(1) puede ir después de K(13) en el extremo derecho
+  if(!fits&&(c.n===1||c.n===14)&&hasKing&&rightVal===13){
+    fits=true;
   }
 
   if(!fits)return false;
@@ -2133,7 +2164,18 @@ function revealEncajar(){
     }
   });
 
-  if(!anyFit){S.msg='Esa carta no encaja en ningún combo de la mesa.';}
+  if(!anyFit){
+    // Detectar si la carta podría encajar si el Joker estuviera reposicionado
+    const allCombos=S.shown.flat();
+    const hayJokerReordenable=allCombos.some(combo=>{
+      if(!combo.cards.some(x=>x.jk))return false;
+      // probar si validCombo funciona con la carta agregada
+      return validCombo([...combo.cards,...sel]);
+    });
+    S.msg=hayJokerReordenable
+      ?'Primero mové el Joker dentro del combo (arrastralo) para hacer lugar.'
+      :'Esa carta no encaja en ningún combo de la mesa.';
+  }
   if(MP.mode==='multi')mpPublicarEstado();
   redraw();
 }
