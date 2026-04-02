@@ -3003,27 +3003,55 @@ function showFinalOv(){
     payHtml=`<div style="font-size:9px;color:rgba(232,220,200,.35);font-style:italic">Empate — nadie paga</div>`;
   }
 
+  // En multijugador: botón nueva partida deshabilitado 10s para que todos lean resultados
+  const needsCountdown=MP.mode==='multi';
+  const COUNTDOWN_SECS=10;
+
   ov.innerHTML=`<h2>${title}</h2><p>${note}</p>
     <table class="rtbl"><tr><th>Jugador</th><th>Pts</th><th>Sobrantes</th></tr>${rows}</table>
     ${penResumen}${payHtml}
     <div style="display:flex;gap:8px;margin-top:6px;width:100%;max-width:280px">
-      <button class="btn" onclick="showCuentas()" style="flex:1">💰 Cuentas</button>
+      <button class="btn" id="OV_CUENTAS_BTN" style="flex:1">💰 Cuentas</button>
       ${MP.mode==='solo'?`<button class="btn" id="OV_RANK_BTN" style="flex:1">🏆 Ranking</button>`:''}
-      <button class="btn pri" onclick="nuevaPartida()" style="flex:2">Nueva partida</button>
+      <button class="btn pri" id="OV_NUEVA_BTN" style="flex:2;transition:opacity .3s"
+        ${needsCountdown?'disabled':''}>
+        ${needsCountdown?`⏳ Nueva partida (${COUNTDOWN_SECS}s)`:'Nueva partida'}
+      </button>
     </div>`;
 
-  // touch events
-  const btns=ov.querySelectorAll('button');
-  btns[0].addEventListener('touchend',e=>{e.preventDefault();showCuentas();},{passive:false});
-  if(MP.mode==='solo'){
-    const rankBtn=ov.querySelector('#OV_RANK_BTN');
-    if(rankBtn){
-      rankBtn.addEventListener('click',()=>showRankingScreen());
-      rankBtn.addEventListener('touchend',e=>{e.preventDefault();showRankingScreen();},{passive:false});
-    }
-    btns[btns.length-1].addEventListener('touchend',e=>{e.preventDefault();nuevaPartida();},{passive:false});
-  } else {
-    btns[1].addEventListener('touchend',e=>{e.preventDefault();nuevaPartida();},{passive:false});
+  // Handlers
+  const cuentasBtn=ov.querySelector('#OV_CUENTAS_BTN');
+  const nuevaBtn=ov.querySelector('#OV_NUEVA_BTN');
+  const rankBtn=ov.querySelector('#OV_RANK_BTN');
+
+  cuentasBtn.addEventListener('click',()=>showCuentas());
+  cuentasBtn.addEventListener('touchend',e=>{e.preventDefault();showCuentas();},{passive:false});
+
+  if(rankBtn){
+    rankBtn.addEventListener('click',()=>showRankingScreen());
+    rankBtn.addEventListener('touchend',e=>{e.preventDefault();showRankingScreen();},{passive:false});
+  }
+
+  const doNueva=()=>nuevaPartida();
+  nuevaBtn.addEventListener('click',doNueva);
+  nuevaBtn.addEventListener('touchend',e=>{e.preventDefault();doNueva();},{passive:false});
+
+  // Countdown solo en multijugador
+  if(needsCountdown){
+    nuevaBtn.style.opacity='0.45';
+    let secs=COUNTDOWN_SECS;
+    const iv=setInterval(()=>{
+      secs--;
+      if(!ov.isConnected){clearInterval(iv);return;}
+      if(secs<=0){
+        clearInterval(iv);
+        nuevaBtn.disabled=false;
+        nuevaBtn.style.opacity='1';
+        nuevaBtn.textContent='Nueva partida';
+      } else {
+        nuevaBtn.textContent=`⏳ Nueva partida (${secs}s)`;
+      }
+    },1000);
   }
 
   $('G').appendChild(ov);
