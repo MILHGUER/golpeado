@@ -578,7 +578,7 @@ function sortCombo(combo){
     });
   }
   const hasJoker=cards.some(c=>c.jk);
-  const nonJokers=cards.filter(c=>!c.jk);
+  const nonJokers=cards.filter(c=>!c.jk&&!c.wl); // excluir también el comodín grupal
   const hasAce=nonJokers.some(c=>c.n===1);
   const hasKing=nonJokers.some(c=>c.n===13);
   const hasLow=nonJokers.some(c=>c.n>=2&&c.n<=3); // 2 o 3 junto con K y A → circular
@@ -1915,17 +1915,20 @@ function botBajarCombos(pid){
     // buscar el MEJOR combo (el que deja menos pts en mano)
     let bestCombo=null,bestScore=999,bestCards=null;
     for(let i=0;i<h.length;i++)for(let j=i+1;j<h.length;j++)for(let k=j+1;k<h.length;k++){
-      if(validCombo([h[i],h[j],h[k]])){
-        // calcular cuántos pts quedarían en mano si bajamos este combo
+      const trio=[h[i],h[j],h[k]];
+      if(validCombo(trio)){
         const remaining=h.filter((_,x)=>x!==i&&x!==j&&x!==k);
         const pts=remaining.reduce((a,c)=>a+cv(c),0);
-        if(pts<bestScore){bestScore=pts;bestCombo=[h[i],h[j],h[k]];bestCards=[i,j,k];}
-        // también probar combos de 4 y 5 cartas
+        if(pts<bestScore){bestScore=pts;bestCombo=trio;bestCards=[i,j,k];}
+        // también probar combos de 4+ cartas
         for(let l=k+1;l<h.length;l++){
-          if(validCombo([h[i],h[j],h[k],h[l]])){
+          const cuatro=[h[i],h[j],h[k],h[l]];
+          // el comodín grupal solo puede ir en grupos, nunca en escaleras
+          if(cuatro.some(c=>c.wl)&&!isGroup(cuatro))continue;
+          if(validCombo(cuatro)){
             const rem4=h.filter((_,x)=>x!==i&&x!==j&&x!==k&&x!==l);
             const p4=rem4.reduce((a,c)=>a+cv(c),0);
-            if(p4<bestScore){bestScore=p4;bestCombo=[h[i],h[j],h[k],h[l]];bestCards=[i,j,k,l];}
+            if(p4<bestScore){bestScore=p4;bestCombo=cuatro;bestCards=[i,j,k,l];}
           }
         }
       }
