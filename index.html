@@ -869,6 +869,7 @@ function saveBank(bank){
 
 let BANK=null; // se inicializa lazy cuando se necesita
 let _revTimer=null;      // timeout del temporizador de revelación
+let _verResCountdown=null; // intervalo del countdown del botón Ver Resultados
 let _revTimerSec=0;      // segundos restantes
 let _revTimerInterval=null; // interval del contador
 const REV_TIMEOUT=180;   // segundos por turno de revelación
@@ -1382,7 +1383,8 @@ function calcPayments(winners,adj,tie,gp,gWon){
 function startGame(){
   UID=0;
   clearRevTimer();
-  Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{}});
+  if(_verResCountdown){clearInterval(_verResCountdown);_verResCountdown=null;}
+  Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_verResSegs:0});
   redraw();
   showBetScreen(); // primero apuesta, luego baraja
 }
@@ -2061,6 +2063,21 @@ function revealNext(){
     clearRevTimer(); // limpiar timer al terminar revelación
     S.phase='mesa_final';S._revPid=-1;
     S.msg='¡Todos mostraron su juego! Presioná Ver resultados.';
+    // En multi: iniciar countdown de 10s antes de habilitar Ver Resultados
+    if(MP.mode==='multi'){
+      S._verResSegs=10;
+      if(_verResCountdown)clearInterval(_verResCountdown);
+      _verResCountdown=setInterval(()=>{
+        S._verResSegs=(S._verResSegs||1)-1;
+        if(S._verResSegs<=0){
+          S._verResSegs=0;
+          clearInterval(_verResCountdown);_verResCountdown=null;
+        }
+        redraw();
+      },1000);
+    } else {
+      S._verResSegs=0;
+    }
     redraw(); // muestra botón "Ver resultados" inmediatamente
     if(MP.mode==='multi')setTimeout(()=>mpPublicarEstado(),50);
     // penalizaciones como overlay encima, no bloquean el botón
@@ -2825,9 +2842,15 @@ function drawActs(){
       const pens=detectPenalties();
       if(pens.length){penHtml=pens.map(p=>'<div style="background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.35);border-radius:6px;padding:5px 10px;font-size:9px;text-align:center;width:100%">⚠️ <span style="color:'+p.color+';font-weight:700">'+p.name+'</span> <span style="color:rgba(232,220,200,.8)"> paga el <strong style="color:#E24B4A">doble</strong> — '+p.reason+'</span></div>').join('');}
     }catch(e){console.log('drawActs error:',e);}
-    ACT.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:100%">'+(summary?'<div style="font-size:9px;color:rgba(232,220,200,.7);text-align:center">'+summary+'</div>':'')+penHtml+'<button class="btn pri" style="width:100%;font-size:11px;padding:8px" onclick="verResultados()">Ver resultados finales →</button></div>';
+    const segsRestantes=S._verResSegs||0;
+    const btnDisabled=MP.mode==='multi'&&segsRestantes>0;
+    const btnLabel=btnDisabled?`⏳ Ver resultados (${segsRestantes}s)`:'Ver resultados finales →';
+    const btnStyle=btnDisabled
+      ?'width:100%;font-size:11px;padding:8px;opacity:0.45;cursor:not-allowed'
+      :'width:100%;font-size:11px;padding:8px';
+    ACT.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:100%">'+(summary?'<div style="font-size:9px;color:rgba(232,220,200,.7);text-align:center">'+summary+'</div>':'')+penHtml+'<button class="btn pri" style="'+btnStyle+'" '+(btnDisabled?'disabled':'')+' onclick="verResultados()">'+btnLabel+'</button></div>';
     const btn=ACT.querySelector('button');
-    if(btn)btn.addEventListener('touchend',e=>{e.preventDefault();verResultados();},{passive:false});
+    if(btn&&!btnDisabled)btn.addEventListener('touchend',e=>{e.preventDefault();verResultados();},{passive:false});
     return;
   }
 
@@ -4068,7 +4091,20 @@ function handleEstadoRemoto(estado){
     rmEl('LOBBY_OV');rmEl('SHUF');
     aplicarEstadoRemoto(estado);
     if(S.phase==='mesa_final'){
-      redraw(); // muestra botón Ver resultados inmediatamente
+      // Iniciar countdown si no está ya corriendo
+      if(!_verResCountdown&&(S._verResSegs===undefined||S._verResSegs>0)){
+        if(S._verResSegs===undefined||S._verResSegs===0)S._verResSegs=10;
+        if(_verResCountdown)clearInterval(_verResCountdown);
+        _verResCountdown=setInterval(()=>{
+          S._verResSegs=(S._verResSegs||1)-1;
+          if(S._verResSegs<=0){
+            S._verResSegs=0;
+            clearInterval(_verResCountdown);_verResCountdown=null;
+          }
+          redraw();
+        },1000);
+      }
+      redraw();
       const penalties=detectPenalties();
       if(penalties.length){
         setTimeout(()=>showPenaltyAnimation(penalties,()=>{redraw();}),600);
