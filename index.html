@@ -495,13 +495,31 @@ function hasBothWilds(hand){return hand.some(c=>c.jk)&&hand.some(c=>c.wl);}
 // Detecta si un jugador usó ambos comodines (en mano O en combos bajados)
 function usedBothWilds(i){
   try{
+    // Buscar todas las cartas del jugador i en cualquier lugar:
+    // mano, combos propios, combos ajenos (encajadas)
+    // Identificar por _owner si está disponible, sino por posición en mano
     const handCards=S.hands[i]||[];
-    // Buscar en combos propios
-    const shownCards=(S.shown[i]||[]).flatMap(combo=>(combo&&combo.cards)||[]);
-    // También buscar en combos de OTROS jugadores (el jugador puede haber encajado sus comodines ahí)
-    const otherShownCards=S.shown.flatMap((shown,j)=>j===i?[]:(shown||[]).flatMap(combo=>(combo&&combo.cards)||[]));
-    const all=[...handCards,...shownCards,...otherShownCards];
-    return all.some(c=>c&&c.jk)&&all.some(c=>c&&c.wl);
+
+    // Todas las cartas de todos los combos en mesa
+    const todasEnMesa=S.shown.flatMap(shown=>(shown||[]).flatMap(combo=>(combo&&combo.cards)||[]));
+
+    // Una carta pertenece al jugador i si:
+    // a) Tiene _owner===i (marcado al repartir o al tomar del mazo)
+    // b) Está en su mano actualmente
+    const misCartas=[
+      ...handCards,
+      ...todasEnMesa.filter(c=>c&&c._owner===i)
+    ];
+
+    // Si _owner no está disponible (partidas viejas), fallback: solo mano + combos propios
+    const tieneOwnerData=todasEnMesa.some(c=>c&&c._owner!==undefined);
+    if(!tieneOwnerData){
+      const shownCards=(S.shown[i]||[]).flatMap(combo=>(combo&&combo.cards)||[]);
+      const fallback=[...handCards,...shownCards];
+      return fallback.some(c=>c&&c.jk)&&fallback.some(c=>c&&c.wl);
+    }
+
+    return misCartas.some(c=>c&&c.jk)&&misCartas.some(c=>c&&c.wl);
   }catch(e){return false;}
 }
 
@@ -1448,7 +1466,7 @@ function animateDeal(seq,onDone){
   let idx=0;
   function next(){
     if(idx>=seq.length){setTimeout(()=>{if(onDone)onDone();},300);return;}
-    const{p,card}=seq[idx];S.hands[p].push(card);
+    const{p,card}=seq[idx];card._owner=p;S.hands[p].push(card);
     const fly=document.createElement('div');fly.className='fly';
     fly.style.left=(ox-cw/2)+'px';fly.style.top=(oy-ch/2)+'px';
     document.body.appendChild(fly);
@@ -1747,6 +1765,7 @@ function actTakeDisc(){
     drawMsg();drawActs();return;
   }
   S.disc.pop(); sndDraw(); // quita del pile + sonido
+  top._owner=0; // el jugador 0 toma la carta
   S.hands[0].push(top);     // agrega a la mano
   clrSel();S.sel=[top.id];  // pre-selecciona la carta tomada
   S.comboThisTurn=false;S.phase='took_discard';
@@ -1844,6 +1863,7 @@ function botTurn(pid){
       if(validCombo([h[i],h[j],top])){
         const a=h[i],b=h[j];
         S.disc.pop();
+        top._owner=pid; // marcar quien tomó el descarte
         S.hands[pid]=rmIds(S.hands[pid],[a.id,b.id]);
         const _ct={cards:[a,b,top],type:comboType([a,b,top])};
         _ct.order=sortCombo(_ct);S.shown[pid].push(_ct);
@@ -1872,7 +1892,7 @@ function botTurn(pid){
     shuf(S.deck);
     S.msg=`¡Mazo rearmado!`;
   }
-  if(S.deck.length)S.hands[pid].push(S.deck.pop());
+  if(S.deck.length){const _c=S.deck.pop();_c._owner=pid;S.hands[pid].push(_c);}
 
   // — Bajar todos los combos posibles —
   botBajarCombos(pid);
@@ -2194,14 +2214,23 @@ function revealEncajar(){
 
 // encaja una carta en un combo específico
 function doFitCard(card,combo){
-  combo.cards.push(card);
-  combo.order=null;
   S.hands[0]=rmIds(S.hands[0],[card.id]);
   S._revSel.delete(card.id);
   sndCard(0.4);
-  // si era el Joker, ofrecer reposicionarlo
   if(card.jk){
-    S.msg='¡Joker encajado! Arrastralo dentro del combo para elegir su posición.';
+    // Joker: agregar al inicio por defecto para que el jugador elija moverlo al final si prefiere
+    // Calcular el orden actual sin el Joker
+    const ordActual=combo.order||sortCombo(combo);
+    // Poner Joker al inicio
+    const newOrd=[card,...ordActual.filter(c=>!c.jk)];
+    combo.cards.push(card);
+    combo.order=newOrd;
+    S.msg='¡Joker encajado al inicio! Si preferís que vaya al final, arrastralo.';
+    // Marcar este combo para que el drag del Joker funcione aunque sea combo ajeno
+    combo._jokerOwner=0; // slot del jugador que encajó el Joker
+  } else {
+    combo.cards.push(card);
+    combo.order=null;
   }
 }
 
@@ -2561,17 +2590,15 @@ function drawCenter(){
         const ce=mkFace(c,false);
         // Joker draggable: en combos propios O en combos ajenos si el Joker pertenece al jugador 0
         // Solo si está en un extremo (primer o último lugar en el orden)
-        const jokerEsDelJugador=c.jk&&!S.over&&(pi===0||(()=>{
-          // verificar si este Joker fue encajado por el jugador 0 buscando su ID en combos propios no... 
-          // simplificación: permitir drag si el jugador 0 tiene un Joker encajado en este combo
-          return false; // por ahora solo combos propios + extremo
-        })());
         const jokerEnExtremo=c.jk&&(cardIdx===0||cardIdx===ordered.length-1);
-        if(c.jk&&pi===0&&!S.over&&jokerEnExtremo){
+        // Draggable si: combo propio O si el Joker fue encajado por el jugador 0 en este combo
+        const jokerDraggable=c.jk&&!S.over&&jokerEnExtremo&&(pi===0||combo._jokerOwner===0);
+        if(jokerDraggable){
           ce.style.cursor='grab';ce.draggable=true;
           ce.title='Arrastrá el Joker al otro extremo para cambiar su valor';
           ce.style.outline='1px dashed rgba(201,168,76,.5)'; // indicar que es draggable
           ce.addEventListener('dragstart',ev=>{ev.dataTransfer.setData('jokerCombo',`${pi},${ci},${cardIdx}`);ev.dataTransfer.effectAllowed='move';});
+          ce.title='Arrastrá al otro extremo para cambiar el valor del Joker';
           let jtx=0,jty=0,jGhost=null;
           ce.addEventListener('touchstart',ev=>{jtx=ev.touches[0].clientX;jty=ev.touches[0].clientY;},{passive:true});
           ce.addEventListener('touchmove',ev=>{
@@ -2602,12 +2629,12 @@ function drawCenter(){
           },{passive:true});
         }
         // Si el Joker está en el medio, no es draggable pero mostrar tooltip
-        if(c.jk&&pi===0&&!S.over&&!jokerEnExtremo){
+        if(c.jk&&!S.over&&!jokerEnExtremo){
           ce.title='El Joker está en el medio — no se puede mover';
           ce.style.cursor='not-allowed';
         }
-        // drop zone para Joker drag (combos propios)
-        if(pi===0&&!S.over){
+        // drop zone para Joker drag (combos propios O con _jokerOwner)
+        if((pi===0||combo._jokerOwner===0)&&!S.over){
           ce.dataset.jdrop=cardIdx;
           ce.addEventListener('dragover',ev=>{ev.preventDefault();ce.style.outline='2px solid '+color;});
           ce.addEventListener('dragleave',()=>ce.style.outline='');
@@ -2615,7 +2642,9 @@ function drawCenter(){
             ev.preventDefault();ce.style.outline='';
             const data=ev.dataTransfer.getData('jokerCombo');if(!data)return;
             const[dpi,dci,fromIdx]=data.split(',').map(Number);
-            if(dpi!==pi||dci!==ci)return;
+            // permitir drop en el mismo combo (propio o con _jokerOwner)
+            if(dci!==ci)return;
+            if(dpi!==pi&&!(combo._jokerOwner===0))return;
             tryJokerMove(combo,fromIdx,cardIdx);
           });
         }
