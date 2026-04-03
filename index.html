@@ -492,6 +492,22 @@ function canFit(comboCards,c,combo){
 
   if(!fits)return false;
 
+  // Verificar que la carta no tenga el mismo valor Y palo que el Joker ya representa
+  // (el Joker ocupa esa posición — no puede entrar la carta real)
+  if(comboCards.some(x=>x.jk)){
+    const jkVal=getJokerValue(combo);
+    if(jkVal>0){
+      // El palo del Joker en escalera = mismo palo que las demás cartas
+      const paloEscalera=nonJ.length>0?nonJ[0].s:null;
+      // Calcular valor real de la carta (A puede ser 14)
+      const cardRealVal=(aceAs14&&c.n===1)?14:c.n;
+      // Si la carta tiene exactamente el valor Y palo que el Joker representa → bloquear
+      if(paloEscalera&&c.s===paloEscalera&&cardRealVal===jkVal){
+        return false; // esa posición ya la ocupa el Joker
+      }
+    }
+  }
+
   // Doble verificación: el combo resultante sigue siendo válido
   return validCombo([...comboCards,c]);
 }
@@ -2298,32 +2314,59 @@ function revealEncajar(){
 
 // Inserta una carta en el extremo correcto de un combo preservando el order
 function insertarEnExtremo(card,combo){
-  if(!combo.order){combo.order=null;return;}
-  const ord=combo.order;
-  const nonJ=combo.cards.filter(x=>!x.jk&&!x.wl&&x.id!==card.id);
-  const hasAce=nonJ.some(x=>x.n===1);
-  const hasKing=nonJ.some(x=>x.n===13);
-  const aceAs14=hasAce&&hasKing;
-  const cardVal=(aceAs14&&card.n===1)?14:card.n;
-  const getVal=c=>{
-    if(c.jk)return getJokerValue(combo);
-    if(c.wl)return -1;
-    if(aceAs14&&c.n===1)return 14;
-    if(c.n>=2&&c.n<=12&&hasKing&&hasAce)return c.n+13;
-    return c.n;
-  };
-  const leftVal=getVal(ord[0]);
-  const rightVal=getVal(ord[ord.length-1]);
-  const circVal=card.n>=2&&card.n<=12?card.n+13:null;
-  if((rightVal>0&&cardVal===rightVal+1)||(circVal&&rightVal>0&&circVal===rightVal+1)){
-    combo.order=[...ord,card]; // al final
-  } else if(leftVal>0&&cardVal===leftVal-1){
-    combo.order=[card,...ord]; // al inicio
-  } else if(card.n===13&&hasAce&&!hasKing){
-    combo.order=[card,...ord]; // K antes del A circular
-  } else {
-    combo.order=null; // sortCombo recalcula
+  // Si el combo tiene Joker con orden establecido por el jugador, RESPETAR esa posición
+  // Solo insertar la carta nueva en el extremo correcto según los extremos actuales
+  const ordActual=combo.order;
+  const tieneJokerOrdenado=ordActual&&combo.cards.some(c=>c.jk);
+
+  if(tieneJokerOrdenado){
+    // Preservar orden del Joker — calcular en qué extremo va la carta nueva
+    const leftCard=ordActual[0];
+    const rightCard=ordActual[ordActual.length-1];
+
+    // Obtener valores efectivos de los extremos considerando el Joker
+    const jkVal=getJokerValue(combo);
+    const nonJ=combo.cards.filter(x=>!x.jk&&!x.wl&&x.id!==card.id);
+    const hasAce=nonJ.some(x=>x.n===1);
+    const hasKing=nonJ.some(x=>x.n===13);
+    const aceAs14=(hasAce&&hasKing)||(hasAce&&nonJ.some(x=>x.n>=10&&x.n<=12)&&!hasKing);
+
+    const getVal=c=>{
+      if(c.jk)return jkVal>0?jkVal:-1;
+      if(c.wl)return -1;
+      if(aceAs14&&c.n===1)return 14;
+      if(hasAce&&hasKing&&c.n>=2&&c.n<=9)return c.n+13;
+      return c.n;
+    };
+
+    const leftVal=getVal(leftCard);
+    const rightVal=getVal(rightCard);
+
+    // Valores posibles de la carta entrante
+    const cardVal=(aceAs14&&card.n===1)?14:card.n;
+    const cardValCirc=(card.n>=2&&card.n<=9&&hasAce&&hasKing)?card.n+13:null;
+
+    if(rightVal>0&&(cardVal===rightVal+1||(cardValCirc&&cardValCirc===rightVal+1))){
+      combo.order=[...ordActual,card]; // al final
+    } else if(leftVal>0&&cardVal===leftVal-1){
+      combo.order=[card,...ordActual]; // al inicio
+    } else if(card.n===13&&hasAce&&!hasKing&&leftVal!==13){
+      combo.order=[card,...ordActual]; // K circular al inicio
+    } else {
+      // No pudo determinar extremo — recalcular pero intentar mantener Joker
+      // Buscar posición del Joker en el orden actual y reconstruir
+      const jokerIdx=ordActual.findIndex(c=>c.jk);
+      combo.order=null;
+      const nuevoOrder=sortCombo(combo); // recalcula con todas las cartas
+      combo.order=nuevoOrder?[...nuevoOrder]:null;
+    }
+    return;
   }
+
+  // Sin Joker con orden establecido: recalcular con sortCombo normalmente
+  combo.order=null;
+  const nuevoOrder=sortCombo(combo);
+  combo.order=nuevoOrder?[...nuevoOrder]:null;
 }
 
 // encaja una carta en un combo específico
@@ -3732,11 +3775,28 @@ async function showRankingEntry(racha){
     const existe=await rankingNombreExiste(nombre);
     if(existe){msg.textContent='Ese nombre ya está registrado. Elegí otro.';ok.disabled=false;return;}
     msg.textContent='Guardando...';
-    await rankingGuardar(nombre,racha,geo.pais,geo.bandera);
-    // guardar nombre en localStorage para futuras sesiones
-    try{localStorage.setItem('golpeado_rank_nombre',nombre);}catch(e){}
-    rmEl('RANK_ENTRY');
-    showRankingScreen();
+    try{
+      const resultado=await rankingGuardar(nombre,racha,geo.pais,geo.bandera);
+      if(resultado===-1){
+        // Error al guardar — mostrar mensaje y permitir reintentar
+        msg.textContent='Error al guardar. Verificá tu conexión e intentá de nuevo.';
+        msg.style.color='#E24B4A';
+        ok.disabled=false;
+        return;
+      }
+      // guardar nombre en localStorage para futuras sesiones
+      try{localStorage.setItem('golpeado_rank_nombre',nombre);}catch(e){}
+      msg.textContent='¡Guardado! 🎉';
+      msg.style.color='#7be87b';
+      setTimeout(()=>{
+        rmEl('RANK_ENTRY');
+        showRankingScreen();
+      },800);
+    }catch(e){
+      msg.textContent='Error de conexión. Intentá de nuevo.';
+      msg.style.color='#E24B4A';
+      ok.disabled=false;
+    }
   };
 
   skip.addEventListener('click',doSkip);
@@ -4236,10 +4296,11 @@ function buildLobbyUI(estado,isHost){
     <div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center;font-style:italic">Esperando que el host inicie la partida...</div>
     <div id="LB_APUESTA_LBL" style="font-size:11px;color:var(--gold);text-align:center;font-weight:700"></div>
     `}
-    <div style="display:flex;gap:8px;width:100%;max-width:300px;margin-top:4px">
-      <button id="LB_BACK" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.4);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">← Salir</button>
-      <button id="LB_HTP" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">❓ Cómo jugar</button>
-      <button id="LB_CUE" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(201,168,76,.4);background:transparent;color:rgba(201,168,76,.7);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">💰 Cuentas</button>
+    <div style="display:flex;gap:6px;width:100%;max-width:300px;margin-top:4px;flex-wrap:wrap">
+      <button id="LB_BACK" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.4);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">← Salir</button>
+      <button id="LB_INICIO" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(74,158,232,.4);background:rgba(74,158,232,.08);color:rgba(74,158,232,.9);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">🏠 Inicio</button>
+      <button id="LB_HTP" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">❓ Cómo jugar</button>
+      <button id="LB_CUE" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(201,168,76,.4);background:transparent;color:rgba(201,168,76,.7);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">💰 Cuentas</button>
     </div>`;
 
   $('G').appendChild(ov);
@@ -4252,6 +4313,12 @@ function buildLobbyUI(estado,isHost){
     const doBack=()=>volverAlMenu();
     backLobbyBtn.addEventListener('click',doBack);
     backLobbyBtn.addEventListener('touchend',e=>{e.preventDefault();doBack();},{passive:false});
+  }
+  const inicioBtn=ov.querySelector('#LB_INICIO');
+  if(inicioBtn){
+    const doInicio=()=>volverAlMenu();
+    inicioBtn.addEventListener('click',doInicio);
+    inicioBtn.addEventListener('touchend',e=>{e.preventDefault();doInicio();},{passive:false});
   }
   const htpBtn=ov.querySelector('#LB_HTP');
   if(htpBtn){const doHtp=()=>showHowToPlay();htpBtn.addEventListener('click',doHtp);htpBtn.addEventListener('touchend',e=>{e.preventDefault();doHtp();},{passive:false});}
