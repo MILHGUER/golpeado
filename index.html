@@ -871,6 +871,7 @@ function saveBank(bank){
 let BANK=null; // se inicializa lazy cuando se necesita
 let _revTimer=null;      // timeout del temporizador de revelación
 let _verResCountdown=null; // intervalo del countdown del botón Ver Resultados
+let _undoStack=[]; // historial de acciones para deshacer en fase revelación
 let _revTimerSec=0;      // segundos restantes
 let _revTimerInterval=null; // interval del contador
 const REV_TIMEOUT=180;   // segundos por turno de revelación
@@ -1385,6 +1386,7 @@ function startGame(){
   UID=0;
   clearRevTimer();
   if(_verResCountdown){clearInterval(_verResCountdown);_verResCountdown=null;}
+  undoClear();
   Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_verResSegs:0});
   redraw();
   showBetScreen(); // primero apuesta, luego baraja
@@ -2037,6 +2039,7 @@ const PNAME=i=>{
 function startReveal(){
   S.phase='golpeado_reveal';
   const gp=S.golpBy;
+  undoClear();
   S._revOrd=[];
   for(let i=1;i<S.np;i++)S._revOrd.push((gp+i)%S.np);
   S._revOrd.push(gp);
@@ -2183,10 +2186,47 @@ function revealToggle(id){
   redraw();
 }
 
+// Guardar snapshot para deshacer (solo fase revelación)
+function undoPush(){
+  // Snapshot liviano: mano del jugador + combos mostrados (propios y ajenos)
+  // No guardamos el estado completo del juego — solo lo que puede cambiar al revelar
+  const snap={
+    hand:[...S.hands[0]],
+    shown:S.shown.map(playerShown=>playerShown.map(combo=>({
+      cards:[...combo.cards],
+      order:combo.order?[...combo.order]:null,
+      type:combo.type,
+      _jokerOwner:combo._jokerOwner
+    }))),
+    msg:S.msg
+  };
+  _undoStack.push(snap);
+  // máximo 10 pasos de deshacer
+  if(_undoStack.length>10)_undoStack.shift();
+}
+
+function undoPop(){
+  if(!_undoStack.length)return false;
+  const snap=_undoStack.pop();
+  // Restaurar mano y combos
+  S.hands[0]=snap.hand;
+  S.shown=snap.shown;
+  S._revSel=new Set();
+  S._fitTarget=null;
+  S._fitCandidates=null;
+  S.msg='↩ Acción deshecha.';
+  if(MP.mode==='multi')mpPublicarEstado();
+  redraw();
+  return true;
+}
+
+function undoClear(){_undoStack=[];}
+
 function revealBajar(){
   const sel=S.hands[0].filter(c=>S._revSel.has(c.id));
   if(sel.length<3){S.msg='Seleccioná mín. 3 cartas para bajar un combo.';redraw();return;}
   if(!validCombo(sel)){S.msg='Esas cartas no forman grupo ni escalera válida.';redraw();return;}
+  undoPush(); // guardar estado antes de bajar
   const _cs={cards:[...sel],type:comboType(sel)};_cs.order=sortCombo(_cs);S.shown[0].push(_cs);
   S.hands[0]=rmIds(S.hands[0],sel.map(c=>c.id));
   S._revSel=new Set();S._fitTarget=null;S._fitCandidates=null;
@@ -2272,6 +2312,7 @@ function insertarEnExtremo(card,combo){
 
 // encaja una carta en un combo específico
 function doFitCard(card,combo){
+  undoPush(); // guardar estado antes de encajar
   S.hands[0]=rmIds(S.hands[0],[card.id]);
   S._revSel.delete(card.id);
   card._fittedBy=0; // marcar quién encajó esta carta
@@ -2349,7 +2390,7 @@ function verResultados(){
   }
 }
 
-function revealListo(){
+function revealListo(){undoClear();
   const pts=S.hands[0].reduce((a,c)=>a+cv(c),0);
   if(pts>0){
     const hayCombo=(()=>{const hh=S.hands[0];for(let i=0;i<hh.length;i++)for(let j=i+1;j<hh.length;j++)for(let k=j+1;k<hh.length;k++)if(validCombo([hh[i],hh[j],hh[k]]))return true;return false;})();
@@ -2882,9 +2923,12 @@ function drawActs(){
       const dimmed=!hayMas;
       const bajarStyle=`flex:1;padding:8px 4px;border-radius:7px;font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation;text-align:center;border:2px solid ${dimmed?`rgba(201,168,76,.25)`:color};background:${dimmed?'transparent':color};color:${dimmed?`rgba(201,168,76,.3)`:`#1a1230`};transition:all .2s`;
       const encajarStyle=`flex:1;padding:8px 4px;border-radius:7px;font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation;text-align:center;border:1.5px solid ${dimmed?'rgba(232,220,200,.12)':'rgba(232,220,200,.55)'};background:transparent;color:${dimmed?'rgba(232,220,200,.2)':'rgba(232,220,200,.8)'};transition:all .2s`;
+      const hayUndo=_undoStack.length>0;
+      const undoStyle=`flex:0 0 auto;padding:8px 6px;border-radius:7px;font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation;text-align:center;border:1.5px solid ${hayUndo?'rgba(226,75,74,.6)':'rgba(226,75,74,.2)'};background:transparent;color:${hayUndo?'rgba(226,75,74,.9)':'rgba(226,75,74,.25)'};transition:all .2s`;
       h+=`<div style="display:flex;gap:6px;width:100%">`;
       h+=`<button onclick="revealBajar()" style="${bajarStyle}">⬇ Bajar combo</button>`;
       h+=`<button onclick="revealEncajar()" style="${encajarStyle}">🔗 Encajar</button>`;
+      h+=`<button onclick="undoPop()" style="${undoStyle}" ${hayUndo?'':'disabled'} title="Deshacer última acción">↩</button>`;
       h+=`</div>`;
     }
 
