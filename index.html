@@ -619,10 +619,12 @@ function sortCombo(combo){
   const sortVal=c=>{
     if(c.jk)return -1; // placeholder, se reemplaza abajo
     if(hasAce&&hasKing&&hasLow){
-      // escalera circular: K=13, A=14, 2=15, 3=16,... sin límite
+      // escalera circular: K=13, A=14, 2=15, 3=16,...
+      // Solo números bajos reales (2-9) van al espacio circular
+      // J(11),Q(12) son cartas altas y mantienen su valor natural
       if(c.n===1)return 14;
-      if(c.n>=2&&c.n<=12)return c.n+13; // 2→15,...,12→25
-      return c.n;
+      if(c.n>=2&&c.n<=9)return c.n+13; // 2→15,...,9→22
+      return c.n; // 10,J,Q mantienen su valor natural
     }
     if(hasAce&&hasKing){
       // Q,K,A — As al final como 14
@@ -649,7 +651,7 @@ function sortCombo(combo){
   const jv=jokerValue(nonJokers);
   // jokerValue devuelve el número "real" (ej 11 para J); convertirlo al mismo espacio
   const jSortVal=(()=>{
-    if(hasAce&&hasKing&&hasLow&&jv>=2&&jv<=5)return jv+13;
+    if(hasAce&&hasKing&&hasLow&&jv>=2&&jv<=9)return jv+13;
     if(hasAce&&hasKing&&jv===1)return 14;
     if(hasLowAndHigh&&jv===13)return 13; // J,Q,Joker(K),A,2 → Joker=13
     if(hasAce&&hasHighCard&&!hasKing&&jv===13)return 13;
