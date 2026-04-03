@@ -338,17 +338,29 @@ function isRun(cs){
 
   // intento 3: circular con A explícito — K,A,2,3,...,N sin límite
   if(baseNums.includes(1)&&baseNums.includes(13)){
-    // Todos los números bajos (2+) van al espacio circular (n+13) sin límite fijo
+    // Solo mapear al espacio circular los números que son continuación del As
+    // Un número n va circular SOLO si n < (mínimo de la secuencia alta - 1)
+    // Ej: [10,11,12,13,A,2,3,4] → altos=[10..13], minAlto=10
+    //     bajos circulares = n < 10-1=9 → 2,3,4 van a 15,16,17 ✓
+    //     9 NO va circular porque 9=10-1 → va al inicio natural ✓
+    const altosPresentes=baseNums.filter(n=>n>=2&&n<=13);
+    const minAlto=altosPresentes.length?Math.min(...altosPresentes.filter(n=>n>=9)):2;
     const wrapped=baseNums.map(n=>{
       if(n===1)return 14;
-      if(n>=2&&n<=12)return n+13; // 2→15, 3→16, ..., 12→25 (pero solo los presentes)
+      if(n>=2&&n<minAlto)return n+13; // solo los genuinamente bajos van circular
       return n;
     });
     if(gapsFor(wrapped)<=jks)return true;
-    // También intentar sin mapear los números que están en la parte baja de la secuencia
-    // para detectar si son continuos con los altos (ej: 10,11,12,13,1,2,3)
+    // También probar solo con A=14 sin mapear bajos (ej: Q,K,A)
     const wrapped2=baseNums.map(n=>(n===1)?14:n);
     if(gapsFor(wrapped2)<=jks)return true;
+    // También probar mapeando todos ≤6 (para K,A,2,3,4,5,6)
+    const wrapped3=baseNums.map(n=>{
+      if(n===1)return 14;
+      if(n>=2&&n<=6)return n+13;
+      return n;
+    });
+    if(gapsFor(wrapped3)<=jks)return true;
   }
 
   // intento 3b: circular con K y bajos sin A explícito
@@ -3156,7 +3168,7 @@ function showFinalOv(){
     const gpen=gp===i&&!gWon&&!tie?`<span style="color:#E24B4A"> ×2</span>`:'';
     const wpen=penalty[i]&&!(gp===i&&!gWon)&&!tie?`<span style="color:#E24B4A"> +60★</span>`:'';
     return`<tr class="${isW?'wrow':''}">
-      <td style="color:${PCOLOR[i]};font-weight:700">${PNAME(i)}${gp===i?' ★':''}</td>
+      <td style="color:${PCOLOR[i]};font-weight:700">${PNAME(i)}${gp===i?' 👊':''}${(adj[i]===min&&!tie)?' 🏆':''}</td>
       <td>${sc}${gpen}${wpen}</td>
       <td style="font-size:9px">${S.hands[i].map(c=>dispN(c)+c.s).join(' ')||'—'}</td>
     </tr>`;
@@ -3241,10 +3253,11 @@ function showFinalOv(){
   ov.innerHTML=`<h2>${title}</h2><p>${note}</p>
     <table class="rtbl"><tr><th>Jugador</th><th>Pts</th><th>Sobrantes</th></tr>${rows}</table>
     ${penResumen}${payHtml}
-    <div style="display:flex;gap:8px;margin-top:6px;width:100%;max-width:280px">
-      <button class="btn" id="OV_CUENTAS_BTN" style="flex:1">💰 Cuentas</button>
-      ${MP.mode==='solo'?`<button class="btn" id="OV_RANK_BTN" style="flex:1">🏆 Ranking</button>`:''}
-      <button class="btn pri" id="OV_NUEVA_BTN" style="flex:2;transition:opacity .3s"
+    <div style="display:flex;gap:8px;margin-top:6px;width:100%;max-width:280px;flex-wrap:wrap">
+      <button class="btn" id="OV_CUENTAS_BTN" style="flex:1;min-width:60px">💰 Cuentas</button>
+      ${MP.mode==='solo'?`<button class="btn" id="OV_RANK_BTN" style="flex:1;min-width:60px">🏆 Ranking</button>`:''}
+      <button class="btn" id="OV_MESA_BTN" style="flex:1;min-width:60px">🃏 Ver mesa</button>
+      <button class="btn pri" id="OV_NUEVA_BTN" style="flex:2;min-width:80px;transition:opacity .3s"
         ${needsCountdown?'disabled':''}>
         ${needsCountdown?`⏳ Nueva partida (${COUNTDOWN_SECS}s)`:'Nueva partida'}
       </button>
@@ -3266,6 +3279,17 @@ function showFinalOv(){
   const doNueva=()=>nuevaPartida();
   nuevaBtn.addEventListener('click',doNueva);
   nuevaBtn.addEventListener('touchend',e=>{e.preventDefault();doNueva();},{passive:false});
+  const mesaBtn=ov.querySelector('#OV_MESA_BTN');
+  if(mesaBtn){
+    const doMesa=()=>{
+      rmEl('OV'); // cerrar resultados
+      // el juego sigue en mesa_final, el jugador puede ver todo
+      // mostrar de nuevo el botón ver resultados por si quiere volver
+      redraw();
+    };
+    mesaBtn.addEventListener('click',doMesa);
+    mesaBtn.addEventListener('touchend',e=>{e.preventDefault();doMesa();},{passive:false});
+  }
 
   // Countdown solo en multijugador
   if(needsCountdown){
@@ -3730,18 +3754,20 @@ async function rankingCalifica(racha){
   try{
     const top=await rankingGetTop(10);
 
-    // Si el ranking está vacío → califica si tiene ≥2
+    // Si el ranking está vacío → califica con ≥2
     if(!top||!top.length)return racha>=2;
 
-    const maxRacha=top[0].racha; // el récord más alto actual
+    // Verificar si el jugador ya tiene nombre guardado y puede actualizar su propio récord
+    const miNombre=(()=>{try{return localStorage.getItem('golpeado_rank_nombre')||'';}catch(e){return '';}})();
+    if(miNombre){
+      const miEntrada=top.find(r=>r.nombre===miNombre);
+      if(miEntrada&&racha>miEntrada.racha)return true; // actualizar su propio récord
+    }
 
-    // Solo califica si SUPERA el récord actual del #1
-    // Si empata con el #1 NO califica (ya alguien lo tiene)
-    if(racha<=maxRacha)return false;
-
-    // Si el ranking tiene menos de 10, puede entrar si supera al #1
-    // Si tiene 10, también debe superar al #1 (para desplazarlo)
-    return true;
+    // Califica si supera al ÚLTIMO del top 10 (o si hay menos de 10 entradas)
+    if(top.length<10)return racha>top[top.length-1].racha||racha>=2;
+    const minRacha=top[top.length-1].racha; // racha mínima para entrar al top 10
+    return racha>minRacha; // debe superar al último para desplazarlo
   }catch(e){return false;}
 }
 
@@ -3758,15 +3784,16 @@ async function rankingGuardar(nombre,racha,pais,bandera){
   const ahora=new Date();
   const fecha=ahora.toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'})+
     ' '+ahora.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
-  // Verificar si ya existe con ese nombre → actualizar si racha es mayor
   try{
     const rows=await sbFetch('/rest/v1/ranking?nombre=eq.'+encodeURIComponent(nombre)+'&select=*');
     if(rows&&rows.length>0){
       const existing=rows[0];
       if(racha>existing.racha){
+        // Actualizar récord — siempre actualiza si supera su propia marca
         await sbFetch('/rest/v1/ranking?nombre=eq.'+encodeURIComponent(nombre),'PATCH',{racha,pais,bandera,fecha});
+        return existing.racha;
       }
-      return existing.racha; // retorna racha anterior
+      return existing.racha;
     } else {
       await sbFetch('/rest/v1/ranking','POST',{nombre,racha,pais,bandera,fecha});
       return 0;
