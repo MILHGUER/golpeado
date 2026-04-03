@@ -56,15 +56,13 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 #ACT{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;padding:0 4px;min-height:26px;align-items:center}
 .plbl{font-family:'Cinzel',serif;font-size:9px;color:rgba(201,168,76,.65)}
 /* HAND — scroll horizontal, overflow-y visible para las cartas seleccionadas */
-.hwrap{width:100%;overflow-x:auto;overflow-y:visible;padding:6px 4px 2px;-webkit-overflow-scrolling:touch;touch-action:pan-x}
+.hwrap{width:100%;overflow-x:hidden;overflow-y:visible;padding:6px 4px 2px}
 .hwrap.dragging{overflow-x:hidden;touch-action:none}
 .hwrap::-webkit-scrollbar{height:5px}
 .hwrap::-webkit-scrollbar-thumb{background:rgba(201,168,76,.55);border-radius:3px}
 .hwrap::-webkit-scrollbar-track{background:rgba(0,0,0,.2);border-radius:3px}
 #PH{display:flex;flex-wrap:nowrap;padding-bottom:8px;padding-top:4px;padding-left:4px}
-#PH .card.hand-card{margin-right:-10px;transition:transform .12s,box-shadow .12s,margin-right .12s}
-#PH .card.hand-card:last-child{margin-right:4px}
-#PH .card.hand-card.sel,#PH .card.hand-card:hover{margin-right:2px;z-index:10}
+#PH .card.hand-card{transition:box-shadow .12s}
 /* CARD */
 .card{width:var(--cw);height:var(--ch);border-radius:4px;border:1.2px solid #ccc;background:#fff;display:grid;grid-template-rows:14px 1fr 14px;cursor:pointer;transition:transform .12s,box-shadow .12s;position:relative;user-select:none;flex-shrink:0;overflow:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 @media(min-width:600px){.card{grid-template-rows:18px 1fr 18px}}
@@ -2947,6 +2945,9 @@ function drawHand(){
       const ceN=mkFace(c,true);ceN.classList.add('hand-card');PH.appendChild(ceN);
     }
   });
+  // Ajustar overlap del abanico directamente (sin delay para evitar parpadeo)
+  ajustarAbanico();
+
   // indicador de voz propio junto al label de la mano
   const myVoiceInd=$('MY_VOICE_IND');
   if(myVoiceInd){
@@ -3003,6 +3004,55 @@ function drawHUD(){
   }
 }
 
+// Ajusta el overlap del abanico de cartas para que todas quepan en pantalla
+function ajustarAbanico(){
+  const ph=document.getElementById('PH');
+  if(!ph)return;
+  const cards=[...ph.querySelectorAll('.card.hand-card')];
+  if(!cards.length)return;
+
+  // Usar el ancho del juego (#G) como referencia confiable
+  const G=document.getElementById('G');
+  const anchoDisp=Math.max((G?G.clientWidth:window.innerWidth)-16, 200);
+  const cardW=cards[0].offsetWidth||(parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hwcw'))||60);
+  const n=cards.length;
+
+  if(n<=1){
+    cards.forEach(c=>{c.style.marginRight='4px';c.style.zIndex='';c.style.transform='';});
+    return;
+  }
+
+  // Overlap: cuánto debe solaparse cada carta para que TODAS quepan
+  // anchoDisp >= cardW + (n-1)*(cardW-overlap) + 4
+  // overlap = cardW - (anchoDisp - cardW - 4) / (n-1)
+  let overlap = cardW - (anchoDisp - cardW - 8) / (n - 1);
+  overlap = Math.max(overlap, 4);             // mínimo visible
+  overlap = Math.min(overlap, cardW * 0.65);  // máximo 65% (número siempre visible)
+
+  // Efecto abanico: leve rotación hacia los extremos
+  const maxRot=n>7?3:4; // menos rotación con más cartas
+  const centro=(n-1)/2;
+
+  cards.forEach((c,i)=>{
+    const isLast=i===n-1;
+    const isSel=c.classList.contains('sel')||
+                (c.style.transform&&c.style.transform.includes('translateY(-'));
+
+    const rot=isSel?0:((i-centro)/centro)*maxRot;
+    const lift=isSel?-14:Math.cos(((i-centro)/centro)*(Math.PI/2))*4;
+
+    // Aplicar sin transition para evitar parpadeo en render inicial
+    c.style.transition='none';
+    c.style.marginRight=isLast?'4px':(isSel?'4px':'-'+Math.round(overlap)+'px');
+    c.style.zIndex=isSel?'20':String(i+1);
+    c.style.transformOrigin='bottom center';
+    c.style.transform=isSel
+      ?`translateY(-14px) rotate(0deg)`
+      :`translateY(-${Math.round(lift)}px) rotate(${rot.toFixed(1)}deg)`;
+    // Restaurar transition después del paint para que selección sea suave
+    requestAnimationFrame(()=>{c.style.transition='box-shadow .12s,transform .12s,margin-right .12s';});
+  });
+}
 function drawActs(){
   const ACT=$('ACT');ACT.innerHTML='';
   const color=PCOLOR[0];
