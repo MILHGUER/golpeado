@@ -7,11 +7,11 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Pro:wght@400;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--felt:#0d3b1f;--gold:#C9A84C;--red:#C0392B;--cw:44px;--ch:65px;--hwcw:52px;--hwch:77px}
-@media(max-width:420px){:root{--cw:32px;--ch:48px;--hwcw:40px;--hwch:59px}}
-@media(min-width:600px){:root{--cw:52px;--ch:76px;--hwcw:62px;--hwch:91px}}
-@media(min-width:900px){:root{--cw:62px;--ch:90px;--hwcw:72px;--hwch:106px}}
-@media(min-width:1200px){:root{--cw:68px;--ch:100px;--hwcw:80px;--hwch:118px}}
+:root{--felt:#0d3b1f;--gold:#C9A84C;--red:#C0392B;--cw:44px;--ch:65px;--hwcw:60px;--hwch:88px}
+@media(max-width:420px){:root{--cw:32px;--ch:48px;--hwcw:48px;--hwch:70px}}
+@media(min-width:600px){:root{--cw:52px;--ch:76px;--hwcw:70px;--hwch:103px}}
+@media(min-width:900px){:root{--cw:62px;--ch:90px;--hwcw:80px;--hwch:118px}}
+@media(min-width:1200px){:root{--cw:68px;--ch:100px;--hwcw:88px;--hwch:130px}}
 /* desktop: centrar y limitar ancho del tapete */
 @media(min-width:600px){
   body{display:flex;align-items:center;justify-content:center;}
@@ -3282,9 +3282,10 @@ function showFinalOv(){
   const mesaBtn=ov.querySelector('#OV_MESA_BTN');
   if(mesaBtn){
     const doMesa=()=>{
-      rmEl('OV'); // cerrar resultados
-      // el juego sigue en mesa_final, el jugador puede ver todo
-      // mostrar de nuevo el botón ver resultados por si quiere volver
+      rmEl('OV');
+      // Restaurar fase mesa_final para que el botón Ver resultados aparezca de nuevo
+      S.over=false;
+      S.phase='mesa_final';
       redraw();
     };
     mesaBtn.addEventListener('click',doMesa);
