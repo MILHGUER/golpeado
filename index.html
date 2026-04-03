@@ -906,6 +906,19 @@ function getBank(){if(!BANK)BANK=loadBank();return BANK;}
 let BET=0; // apuesta actual de la partida
 
 // ── PANTALLA DE APUESTA ──
+// Volver a la pantalla inicial desde lobby o apuesta
+function volverAlMenu(){
+  // Detener polling multi si estaba corriendo
+  if(MP._pollInterval){clearInterval(MP._pollInterval);MP._pollInterval=null;}
+  if(MP._presenceInterval){clearInterval(MP._presenceInterval);MP._presenceInterval=null;}
+  if(_verResCountdown){clearInterval(_verResCountdown);_verResCountdown=null;}
+  voiceStop(true);
+  // Resetear estado multi
+  MP.mode='';MP.salaId='';MP.myId='';MP.isHost=false;
+  // Cerrar overlays y volver al menú
+  rmEl('LOBBY_OV');rmEl('BET_OV');rmEl('NOM_OV');rmEl('MODE_OV');
+  showModeScreen();
+}
 function showBetScreen(){
   rmEl('BET_OV');
   BET=0;
@@ -995,6 +1008,7 @@ function showBetScreen(){
       <div id="CHIP_ROW" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"></div>
       <div id="BET_INFO" style="font-family:Cinzel,serif;font-size:13px;color:rgba(232,220,200,.4)">Seleccioná una ficha</div>
       <div style="display:flex;gap:10px;width:100%">
+        <button id="BET_BACK" style="flex:0 0 auto;padding:10px 8px;border-radius:6px;border:1.5px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.45);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">← Volver</button>
         <button id="BET_SKIP" style="flex:1;padding:10px;border-radius:6px;border:1.5px solid rgba(232,220,200,.3);background:transparent;color:rgba(232,220,200,.5);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">Sin apuesta</button>
         <button id="BET_OK" disabled style="flex:2;padding:10px;border-radius:6px;border:1.5px solid var(--gold);background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;opacity:.4">Jugar →</button>
       </div>
@@ -1037,6 +1051,8 @@ function showBetScreen(){
   const ok=ov.querySelector('#BET_OK');
   const doSkip=()=>{BET=0;ov.remove();showShufOv();};
   const doOk=()=>{if(BET>0){ov.remove();showShufOv();}};
+  const backBtn=ov.querySelector('#BET_BACK');
+  if(backBtn){backBtn.addEventListener('click',()=>{ov.remove();volverAlMenu();});backBtn.addEventListener('touchend',e=>{e.preventDefault();ov.remove();volverAlMenu();},{passive:false});}
   skip.addEventListener('click',doSkip);skip.addEventListener('touchend',e=>{e.preventDefault();doSkip();},{passive:false});
   ok.addEventListener('click',doOk);ok.addEventListener('touchend',e=>{e.preventDefault();doOk();},{passive:false});
 
@@ -4221,6 +4237,7 @@ function buildLobbyUI(estado,isHost){
     <div id="LB_APUESTA_LBL" style="font-size:11px;color:var(--gold);text-align:center;font-weight:700"></div>
     `}
     <div style="display:flex;gap:8px;width:100%;max-width:300px;margin-top:4px">
+      <button id="LB_BACK" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.4);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">← Salir</button>
       <button id="LB_HTP" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">❓ Cómo jugar</button>
       <button id="LB_CUE" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(201,168,76,.4);background:transparent;color:rgba(201,168,76,.7);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">💰 Cuentas</button>
     </div>`;
@@ -4230,6 +4247,12 @@ function buildLobbyUI(estado,isHost){
   drawVoiceUI(); // mostrar botón de micrófono en lobby
 
   // botones cómo jugar y cuentas en lobby
+  const backLobbyBtn=ov.querySelector('#LB_BACK');
+  if(backLobbyBtn){
+    const doBack=()=>volverAlMenu();
+    backLobbyBtn.addEventListener('click',doBack);
+    backLobbyBtn.addEventListener('touchend',e=>{e.preventDefault();doBack();},{passive:false});
+  }
   const htpBtn=ov.querySelector('#LB_HTP');
   if(htpBtn){const doHtp=()=>showHowToPlay();htpBtn.addEventListener('click',doHtp);htpBtn.addEventListener('touchend',e=>{e.preventDefault();doHtp();},{passive:false});}
   const cueBtn=ov.querySelector('#LB_CUE');
@@ -4329,6 +4352,32 @@ function buildLobbyUI(estado,isHost){
         const est=row.estado;
         if(est.jugadores.length<2){
           alert('Necesitás mínimo 2 jugadores para iniciar.');return;
+        }
+        // Confirmar si no seleccionó apuesta
+        if(!apuestaSeleccionada||apuestaSeleccionada===0){
+          // Mostrar mini-confirmación inline
+          const confirmarDiv=document.createElement('div');
+          confirmarDiv.id='BET_CONFIRM';
+          confirmarDiv.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.85);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:900;padding:24px;text-align:center';
+          confirmarDiv.innerHTML=`
+            <div style="font-size:28px">💰</div>
+            <div style="font-family:Cinzel,serif;font-size:14px;color:var(--gold)">¿Sin apuesta?</div>
+            <div style="font-size:11px;color:rgba(232,220,200,.7);line-height:1.6">
+              No seleccionaste ninguna ficha.<br>
+              ¿Querés jugar sin apuesta o volver a elegir?
+            </div>
+            <div style="display:flex;gap:10px;width:100%;max-width:260px">
+              <button id="BC_VOLVER" style="flex:1;padding:10px;border-radius:7px;border:1.5px solid rgba(201,168,76,.5);background:transparent;color:var(--gold);font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation">← Elegir apuesta</button>
+              <button id="BC_SINBET" style="flex:1;padding:10px;border-radius:7px;border:none;background:rgba(232,220,200,.15);color:rgba(232,220,200,.7);font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation">Jugar sin apuesta</button>
+            </div>`;
+          $('LOBBY_OV').appendChild(confirmarDiv);
+          const tap2=(btn,fn)=>{btn.addEventListener('click',fn);btn.addEventListener('touchend',e=>{e.preventDefault();fn();},{passive:false});};
+          tap2(confirmarDiv.querySelector('#BC_VOLVER'),()=>confirmarDiv.remove());
+          tap2(confirmarDiv.querySelector('#BC_SINBET'),async()=>{
+            confirmarDiv.remove();
+            iniciarPartidaMulti(est);
+          });
+          return;
         }
         iniciarPartidaMulti(est);
       };
