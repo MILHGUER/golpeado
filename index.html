@@ -7,11 +7,11 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Pro:wght@400;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
-:root{--felt:#0d3b1f;--gold:#C9A84C;--red:#C0392B;--cw:44px;--ch:65px}
-@media(max-width:420px){:root{--cw:32px;--ch:48px}}
-@media(min-width:600px){:root{--cw:52px;--ch:76px}}
-@media(min-width:900px){:root{--cw:62px;--ch:90px}}
-@media(min-width:1200px){:root{--cw:68px;--ch:100px}}
+:root{--felt:#0d3b1f;--gold:#C9A84C;--red:#C0392B;--cw:44px;--ch:65px;--hwcw:52px;--hwch:77px}
+@media(max-width:420px){:root{--cw:32px;--ch:48px;--hwcw:40px;--hwch:59px}}
+@media(min-width:600px){:root{--cw:52px;--ch:76px;--hwcw:62px;--hwch:91px}}
+@media(min-width:900px){:root{--cw:62px;--ch:90px;--hwcw:72px;--hwch:106px}}
+@media(min-width:1200px){:root{--cw:68px;--ch:100px;--hwcw:80px;--hwch:118px}}
 /* desktop: centrar y limitar ancho del tapete */
 @media(min-width:600px){
   body{display:flex;align-items:center;justify-content:center;}
@@ -58,14 +58,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 /* HAND — scroll horizontal, overflow-y visible para las cartas seleccionadas */
 .hwrap{width:100%;overflow-x:auto;overflow-y:visible;padding:6px 4px 2px;-webkit-overflow-scrolling:touch;touch-action:pan-x}
 .hwrap.dragging{overflow-x:hidden;touch-action:none}
-.hwrap::-webkit-scrollbar{height:3px}
-.hwrap::-webkit-scrollbar-thumb{background:rgba(201,168,76,.4);border-radius:2px}
-#PH{display:flex;gap:3px;flex-wrap:nowrap;min-width:max-content;padding-bottom:2px;padding-top:2px}
+.hwrap::-webkit-scrollbar{height:5px}
+.hwrap::-webkit-scrollbar-thumb{background:rgba(201,168,76,.55);border-radius:3px}
+.hwrap::-webkit-scrollbar-track{background:rgba(0,0,0,.2);border-radius:3px}
+#PH{display:flex;gap:2px;flex-wrap:nowrap;min-width:max-content;padding-bottom:4px;padding-top:2px}
 /* CARD */
 .card{width:var(--cw);height:var(--ch);border-radius:4px;border:1.2px solid #ccc;background:#fff;display:grid;grid-template-rows:14px 1fr 14px;cursor:pointer;transition:transform .12s,box-shadow .12s;position:relative;user-select:none;flex-shrink:0;overflow:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 @media(min-width:600px){.card{grid-template-rows:18px 1fr 18px}}
 @media(min-width:900px){.card{grid-template-rows:20px 1fr 20px}}
 @media(min-width:1200px){.card{grid-template-rows:22px 1fr 22px}}
+/* Cartas de la mano del jugador — más grandes */
+.card.hand-card{width:var(--hwcw);height:var(--hwch);border-radius:5px;grid-template-rows:17px 1fr 17px;border-width:1.5px}
+@media(min-width:600px){.card.hand-card{grid-template-rows:20px 1fr 20px}}
+@media(min-width:900px){.card.hand-card{grid-template-rows:23px 1fr 23px}}
+@media(min-width:1200px){.card.hand-card{grid-template-rows:26px 1fr 26px}}
 .card.draggable{touch-action:pan-y}
 .card.red{color:#C0392B}.card.blk{color:#111111}.card.green{color:#1a6e1a}.card.orange{color:#1E90FF}
 .card.jkcard{background:linear-gradient(135deg,#2a0a4a,#1a0a3a);border-color:#7B5AAA;border-width:1.5px}
@@ -80,6 +86,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 @media(min-width:900px){.cnn{font-size:13px}.cns{font-size:12px}}
 @media(min-width:1200px){.cnn{font-size:14px}.cns{font-size:13px}}
 @media(max-width:420px){.cnn{font-size:9px}.cns{font-size:8px}}
+.hand-card .cnn{font-size:14px}.hand-card .cns{font-size:12px}
+@media(max-width:420px){.hand-card .cnn{font-size:12px}.hand-card .cns{font-size:10px}}
+@media(min-width:600px){.hand-card .cnn{font-size:16px}.hand-card .cns{font-size:14px}}
 .cc{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .cc svg{width:100%;height:100%;display:block}
 .cbk{width:100%;height:100%;background:#1a1230;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
@@ -2855,8 +2864,9 @@ function drawHand(){
     if(isReveal){
       const isSel=S._revSel&&S._revSel.has(c.id);
       const ce=mkFace(c,false);
+      ce.classList.add('hand-card');
       ce.style.outline=isSel?`2.5px solid ${PCOLOR[0]}`:`1.5px solid ${PCOLOR[0]}55`;
-      ce.style.transform=isSel?'translateY(-10px)':'none';
+      ce.style.transform=isSel?'translateY(-14px)':'none';
       ce.style.transition='transform .12s,outline .12s';
       ce.style.cursor='pointer';
       let touched=false;
@@ -2869,6 +2879,7 @@ function drawHand(){
       PH.appendChild(ce);
     } else if(showX){
       const ce=mkFace(c,false);
+      ce.classList.add('hand-card');
       ce.style.outline=`1.5px solid ${PCOLOR[0]}66`;
       ce.style.position='relative';
       const xMark=document.createElement('div');
@@ -2877,7 +2888,7 @@ function drawHand(){
       ce.appendChild(xMark);
       PH.appendChild(ce);
     } else {
-      PH.appendChild(mkFace(c,true));
+      const ceN=mkFace(c,true);ceN.classList.add('hand-card');PH.appendChild(ceN);
     }
   });
   // indicador de voz propio junto al label de la mano
