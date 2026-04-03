@@ -4332,7 +4332,12 @@ function buildLobbyUI(estado,isHost){
   // botones cómo jugar y cuentas en lobby
   const backLobbyBtn=ov.querySelector('#LB_BACK');
   if(backLobbyBtn){
-    const doBack=()=>volverAlMenu();
+    const doBack=()=>{
+      // Volver a pantalla de nombre para que pueda cambiar su nombre
+      rmEl('LOBBY_OV');
+      const accion=isHost?'crear':'unir';
+      showNombreScreen(accion);
+    };
     backLobbyBtn.addEventListener('click',doBack);
     backLobbyBtn.addEventListener('touchend',e=>{e.preventDefault();doBack();},{passive:false});
   }
@@ -4345,7 +4350,16 @@ function buildLobbyUI(estado,isHost){
   const htpBtn=ov.querySelector('#LB_HTP');
   if(htpBtn){const doHtp=()=>showHowToPlay();htpBtn.addEventListener('click',doHtp);htpBtn.addEventListener('touchend',e=>{e.preventDefault();doHtp();},{passive:false});}
   const cueBtn=ov.querySelector('#LB_CUE');
-  if(cueBtn){const doCue=()=>showCuentas();cueBtn.addEventListener('click',doCue);cueBtn.addEventListener('touchend',e=>{e.preventDefault();doCue();},{passive:false});}
+  if(cueBtn){
+    const doCue=async()=>{
+      await showCuentas();
+      // subir z-index para que aparezca sobre el lobby
+      const cueOv=document.getElementById('CUE_OV');
+      if(cueOv)cueOv.style.zIndex='900';
+    };
+    cueBtn.addEventListener('click',doCue);
+    cueBtn.addEventListener('touchend',e=>{e.preventDefault();doCue();},{passive:false});
+  }
 
   // copiar enlace
   const copyBtn=ov.querySelector('#LB_COPY');
