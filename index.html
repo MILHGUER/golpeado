@@ -61,7 +61,10 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 .hwrap::-webkit-scrollbar{height:5px}
 .hwrap::-webkit-scrollbar-thumb{background:rgba(201,168,76,.55);border-radius:3px}
 .hwrap::-webkit-scrollbar-track{background:rgba(0,0,0,.2);border-radius:3px}
-#PH{display:flex;gap:2px;flex-wrap:nowrap;min-width:max-content;padding-bottom:4px;padding-top:2px}
+#PH{display:flex;flex-wrap:nowrap;padding-bottom:8px;padding-top:4px;padding-left:4px}
+#PH .card.hand-card{margin-right:-10px;transition:transform .12s,box-shadow .12s,margin-right .12s}
+#PH .card.hand-card:last-child{margin-right:4px}
+#PH .card.hand-card.sel,#PH .card.hand-card:hover{margin-right:2px;z-index:10}
 /* CARD */
 .card{width:var(--cw);height:var(--ch);border-radius:4px;border:1.2px solid #ccc;background:#fff;display:grid;grid-template-rows:14px 1fr 14px;cursor:pointer;transition:transform .12s,box-shadow .12s;position:relative;user-select:none;flex-shrink:0;overflow:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 @media(min-width:600px){.card{grid-template-rows:18px 1fr 18px}}
@@ -938,10 +941,16 @@ function volverAlMenu(){
   if(MP._presenceInterval){clearInterval(MP._presenceInterval);MP._presenceInterval=null;}
   if(_verResCountdown){clearInterval(_verResCountdown);_verResCountdown=null;}
   voiceStop(true);
-  // Resetear estado multi
-  MP.mode='';MP.salaId='';MP.myId='';MP.isHost=false;
-  // Cerrar overlays y volver al menú
-  rmEl('LOBBY_OV');rmEl('BET_OV');rmEl('NOM_OV');rmEl('MODE_OV');
+  // Resetear estado multi completo
+  MP.mode='';MP.salaId='';MP._lastSalaId='';MP.myId='';MP.myName='';MP.isHost=false;
+  // Limpiar hash de la URL para que showModeScreen no detecte sala=
+  try{
+    if(window.location.hash&&window.location.hash.includes('sala=')){
+      history.replaceState(null,'',window.location.pathname);
+    }
+  }catch(e){}
+  // Cerrar todos los overlays
+  rmEl('LOBBY_OV');rmEl('BET_OV');rmEl('NOM_OV');rmEl('MODE_OV');rmEl('SHUF');
   showModeScreen();
 }
 function showBetScreen(){
@@ -1188,7 +1197,7 @@ async function showCuentas(){
   // en multi: cargar banco actualizado desde Supabase
   const cuentasSalaId=MP.salaId||MP._lastSalaId||'';
   if(MP.mode==='multi'&&cuentasSalaId){
-    await loadBankFromSupabase();
+    try{await loadBankFromSupabase();}catch(e){} // ignorar error si no hay datos
   } else if(MP.mode!=='multi'){
     // modo local, no necesita cargar
   }
@@ -2867,7 +2876,9 @@ function drawHand(){
       ce.classList.add('hand-card');
       ce.style.outline=isSel?`2.5px solid ${PCOLOR[0]}`:`1.5px solid ${PCOLOR[0]}55`;
       ce.style.transform=isSel?'translateY(-14px)':'none';
-      ce.style.transition='transform .12s,outline .12s';
+      ce.style.zIndex=isSel?'10':'';
+      ce.style.marginRight=isSel?'2px':'-10px';
+      ce.style.transition='transform .12s,outline .12s,margin-right .12s';
       ce.style.cursor='pointer';
       let touched=false;
       ce.addEventListener('touchend',e=>{
