@@ -1882,20 +1882,41 @@ function actDiscard(){
 }
 
 // TURN FLOW
+// Notificación de turno: vibración + sonido suave
+function notificarMiTurno(){
+  // Vibración (solo mobile, si el browser lo soporta)
+  try{if(navigator.vibrate)navigator.vibrate([60,30,60]);}catch(e){}
+  // Sonido suave tipo "ding"
+  try{
+    const ctx=getCtx();
+    const osc=ctx.createOscillator();
+    const g=ctx.createGain();
+    osc.type='sine';
+    osc.frequency.setValueAtTime(880,ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(660,ctx.currentTime+0.15);
+    g.gain.setValueAtTime(0,ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.18,ctx.currentTime+0.02);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.35);
+    osc.connect(g);g.connect(ctx.destination);
+    osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.35);
+  }catch(e){}
+}
 function passTurn(){
   clrSel();S.comboThisTurn=false;
   S.cur=(S.cur+1)%S.np;
   if(S.over)return;
   if(MP.mode==='multi'){
-    // en multi: publicar estado y esperar que el otro jugador actúe
     const esMiTurno=S.cur===MP.mySlot;
     S.phase='play';
-    S.msg=esMiTurno?'Tu turno: ¡GOLPEADO! · tomar descarte · tomar del mazo.':
-      `Turno de ${PNAME(S.cur)}...`;
+    const miNombreM=MP.myName||'Tú';
+    S.msg=esMiTurno
+      ?`${miNombreM}: ¡GOLPEADO! · tomar descarte · tomar del mazo.`
+      :`Turno de ${PNAME(S.cur)}...`;
+    if(esMiTurno)notificarMiTurno(); // vibración + sonido
     mpPublicarEstado();
     redraw();
   } else {
-    // modo solo: turnos normales con bots
+    // modo bots: usar "Tu turno" genérico
     if(S.cur===0){S.phase='play';S.msg='Tu turno: ¡GOLPEADO! · tomar descarte · tomar del mazo.';redraw();}
     else{S.phase='bot';S.msg=`Bot ${S.cur} piensa...`;redraw();setTimeout(()=>botTurn(S.cur),850);}
   }
@@ -4881,12 +4902,19 @@ function aplicarEstadoRemoto(estado){
   // regenerar mensaje según perspectiva local (no copiar el del otro jugador)
   if(S.phase==='play'||S.phase==='first_discard'){
     if(S.cur===0){
-      S.msg='Tu turno: ¡GOLPEADO! · tomar descarte · tomar del mazo.';
+      const miNomAp=MP.myName||'Tú';
+      const eraOtroTurno=S.msg&&!S.msg.startsWith(miNomAp);
+      S.msg=`${miNomAp}: ¡GOLPEADO! · tomar descarte · tomar del mazo.`;
+      // Solo notificar si cambió de turno (no repetir en cada redraw)
+      if(eraOtroTurno)notificarMiTurno();
     } else {
       S.msg='Turno de '+PNAME(S.cur)+'...';
     }
   } else if(S.phase==='golpeado_reveal'){
-    if(S._revPid===0) S.msg='Tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.';
+    if(S._revPid===0){
+      const miNomR=MP.myName||'Tú';
+      S.msg=`${miNomR}: tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.`;
+    }
     else if(S._revPid>0) S.msg=PNAME(S._revPid)+' está mostrando su juego...';
     else S.msg=estado.msg||'';
   } else if(S.phase==='mesa_final'){
