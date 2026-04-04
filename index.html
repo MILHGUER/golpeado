@@ -1440,17 +1440,19 @@ function calcPayments(winners,adj,tie,gp,gWon){
     const monto=esPenalizado?BET*2:BET;
     const razon=golpoSinGanar?'golpeó sin ganar':tieneComodines?'2 comodines':'pierde';
     payments.push({from:i,to:winner,amount:monto,reason:razon});
-    // solo el host (o modo solo) actualiza el banco para evitar duplicación
-    if(MP.mode!=='multi'||MP.isHost){
-      // usar índices reales para el banco
+    // solo el host (o modo solo) actualiza el banco, y solo la primera vez
+    if(!S._pagoProcessed&&(MP.mode!=='multi'||MP.isHost)){
       const realFrom=toReal(i);
       const realTo=toReal(winner);
       if(!bankMatrix[realFrom])bankMatrix[realFrom]=Array(S.np).fill(0);
       bankMatrix[realFrom][realTo]=(bankMatrix[realFrom][realTo]||0)+monto;
     }
   }
-  // solo guardar si es host o modo solo
-  if(MP.mode!=='multi'||MP.isHost)saveBank(BANK);
+  // solo guardar si es host o modo solo, y solo la primera vez (evitar doble conteo)
+  if(!S._pagoProcessed&&(MP.mode!=='multi'||MP.isHost)){
+    S._pagoProcessed=true;
+    saveBank(BANK);
+  }
   return payments;
 }
 
@@ -1459,7 +1461,7 @@ function startGame(){
   clearRevTimer();
   if(_verResCountdown){clearInterval(_verResCountdown);_verResCountdown=null;}
   undoClear();
-  Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_verResSegs:0,_rachaProcessed:false});
+  Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_verResSegs:0,_rachaProcessed:false,_pagoProcessed:false});
   redraw();
   showBetScreen(); // primero apuesta, luego baraja
 }
