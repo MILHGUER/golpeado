@@ -1829,7 +1829,7 @@ function actDraw(){
   sndDraw();
   clrSel();S.comboThisTurn=false;S.phase='drew';
   mpPublicarEstado();
-  S.msg=miNom()+': Tomaste una carta. Mostrá 1 combo o descartá 1.';
+  S.msg=miNom()+': Tomaste una carta. Mostrá combo o seleccioná 1 carta para descartar.';
   redraw();
 }
 
@@ -1851,7 +1851,7 @@ function actTakeDisc(){
   S.hands[0].push(top);     // agrega a la mano
   clrSel();S.sel=[top.id];  // pre-selecciona la carta tomada
   S.comboThisTurn=false;S.phase='took_discard';
-  S.msg=miNom()+': Tomaste el descarte. Seleccioná 3+ cartas y mostrá combo.';
+  S.msg=miNom()+': Tomaste el descarte. Seleccioná 3+ cartas (incluyendo la tomada) y mostrá combo.';
   redraw();
 }
 
@@ -1864,7 +1864,7 @@ function actShowCombo(){
   const _c0={cards:[...cs],type:comboType(cs)};_c0.order=sortCombo(_c0);S.shown[0].push(_c0);
   S.hands[0]=rmIds(S.hands[0],ids);
   sndCombo();clrSel();S.comboThisTurn=true;S.phase="showed_combo";mpPublicarEstado();
-  S.msg=miNom()+': ¡Combo mostrado! Seleccioná 1 carta para descartar.';
+  S.msg=miNom()+': ¡Combo mostrado! Ahora seleccioná 1 carta que no necesites y presioná Descartar.';
   redraw();
 }
 
