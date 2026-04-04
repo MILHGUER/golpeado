@@ -757,18 +757,21 @@ function isJokerPosValid(orderedCards,jokerPos){
 
   if(left&&right){
     // debe haber exactamente 1 hueco entre ellos (el Joker lo rellena)
-    return val(right.c)-val(left.c)===2;
+    const diff=val(right.c)-val(left.c);
+    return diff===2;
   }
   if(left&&!right){
-    // Joker al final: valor = val(left)+1, debe ser ≤14
+    // Joker al final: valor = val(left)+1
+    // Permitir valores circulares (ej: después de 2→15 puede venir 3→16)
     const jv=val(left.c)+1;
-    return jv<=14;
+    // Solo rechazar si el valor es absurdo (>20 o negativo)
+    return jv>=1&&jv<=20;
   }
   if(!left&&right){
     // Joker al inicio: valor = val(right)-1
-    // En escalera circular con A=14 al final, el Joker puede ir antes del primero
     const jv=val(right.c)-1;
-    return jv>=1;
+    // Permitir jv=0 para K(13) antes de A en algunos casos — solo rechazar negativos
+    return jv>=0;
   }
   return true;
 }
@@ -3362,7 +3365,7 @@ function drawActs(){
     const listoActivo=(!_hh.length||!hayMas);
     if(listoActivo){
       // Mostrar countdown en el label
-      const autoSegs=S._autoListoSegs!==undefined?S._autoListoSegs:4;
+      const autoSegs=S._autoListoSegs!==undefined?S._autoListoSegs:8;
       if(autoSegs>0){
         listoLabel+=' ('+autoSegs+'s)';
       }
@@ -3373,7 +3376,7 @@ function drawActs(){
     // Arrancar/reiniciar timer de auto-listo solo si el botón está activo
     if(listoActivo){
       if(!_autoListoTimer){
-        S._autoListoSegs=4;
+        S._autoListoSegs=8;
         const tick=()=>{
           S._autoListoSegs=(S._autoListoSegs||1)-1;
           if(S._autoListoSegs<=0){
