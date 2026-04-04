@@ -5464,32 +5464,24 @@ function voiceStop(skipPublish){
 
 // ── Dibujar botón de voz e indicadores ──
 function drawVoiceUI(){
-  // botón flotante 🎙️ disponible en multi cuando hay sala
+  // Botón flotante de WhatsApp para llamada de voz durante el juego
   rmEl('VOICE_BTN');
   if(MP.mode!=='multi'||!MP.salaId)return;
-  // no mostrar durante animaciones de barajado/repartición
   if(S.phase==='shuffle'||S.phase==='dealing')return;
 
   const btn=document.createElement('button');
   btn.id='VOICE_BTN';
-  const isSpeaking=VOICE.speaking;
-  // Verificar estado de conexiones peer
-  const peers=Object.values(VOICE.peers||{});
-  const connState=peers.length===0?'none':
-    peers.some(p=>p.connectionState==='connected'||p.connectionState==='completed')?'connected':
-    peers.some(p=>p.connectionState==='connecting'||p.iceConnectionState==='checking')?'connecting':'failed';
-  const color=VOICE.enabled?
-    (isSpeaking?'#7be87b':connState==='connected'?'#C9A84C':connState==='connecting'?'#4A9EE8':'rgba(226,75,74,.8)'):
-    'rgba(232,220,200,.35)';
-  const bg=VOICE.enabled?'rgba(0,0,0,.85)':'rgba(0,0,0,.5)';
-  const icon=!VOICE.enabled?'🎙️':isSpeaking?'🔊':'🎙️';
-  const stateHint=VOICE.enabled?(connState==='connected'?'':'connecting'==='connecting'?'⟳':'⚠'):'';
-  btn.style.cssText=`position:absolute;bottom:70px;right:8px;z-index:850;width:38px;height:38px;border-radius:50%;border:2px solid ${color};background:${bg};font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:border-color .2s;box-shadow:${isSpeaking?'0 0 10px rgba(123,232,123,.6)':connState==='connected'&&VOICE.enabled?'0 0 6px rgba(201,168,76,.4)':'none'}`;
-  btn.textContent=icon;
-  const stateText=VOICE.enabled?(connState==='connected'?'Conectado — click para desactivar':connState==='connecting'?'Conectando...':'Sin conexión de voz'):'Activar micrófono';
-  btn.title=stateText;
-  btn.addEventListener('click',voiceToggle);
-  btn.addEventListener('touchend',e=>{e.preventDefault();voiceToggle();},{passive:false});
+  btn.style.cssText=`position:absolute;bottom:70px;right:8px;z-index:850;width:42px;height:42px;border-radius:50%;border:2px solid #25D366;background:rgba(0,0,0,.8);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 8px rgba(37,211,102,.3)`;
+  btn.textContent='📞';
+  btn.title='Llamada de voz por WhatsApp';
+  const doWA=()=>{
+    const baseUrl=window.location.origin+window.location.pathname;
+    const enlace=baseUrl+'#sala='+MP.salaId;
+    const msg='🎙️ ¡Hagamos una llamada de voz para jugar GOLPEADO!\nEntrá a la sala: '+enlace;
+    window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+  };
+  btn.addEventListener('click',doWA);
+  btn.addEventListener('touchend',e=>{e.preventDefault();doWA();},{passive:false});
   $('G').appendChild(btn);
 }
 
