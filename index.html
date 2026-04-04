@@ -1461,6 +1461,7 @@ function startGame(){
   clearRevTimer();
   if(_verResCountdown){clearInterval(_verResCountdown);_verResCountdown=null;}
   undoClear();
+  clearTurnReminder();
   Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_verResSegs:0,_rachaProcessed:false,_pagoProcessed:false});
   redraw();
   showBetScreen(); // primero apuesta, luego baraja
@@ -1755,6 +1756,7 @@ function showGolpeAnimation(playerName,callback){
 
 function actGolpe(){
   if(S.over||S.cur!==0||S.phase!=='play')return;
+  clearTurnReminder();
   // pedir confirmación antes de declarar GOLPEADO
   rmEl('GOLPE_CONF');
   const d=document.createElement('div');d.id='GOLPE_CONF';
@@ -1819,6 +1821,7 @@ function refillDeck(callback){
 
 function actDraw(){
   if(S.over||S.cur!==0||S.phase!=='play')return;
+  clearTurnReminder();
   if(!S.deck.length){
     // mazo vacío → refill con descarte y barajar
     if(!S.disc.length){S.msg='¡No quedan cartas!';drawMsg();return;}
@@ -1835,6 +1838,7 @@ function actDraw(){
 
 function actTakeDisc(){
   if(S.over||S.cur!==0||S.phase!=='play'||!S.disc.length)return;
+  clearTurnReminder();
   const top=S.disc[S.disc.length-1];
   // verificar si puede formar combo ANTES de tomarla
   const hand=S.hands[0];
@@ -1901,6 +1905,45 @@ function notificarMiTurno(){
     osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.35);
   }catch(e){}
 }
+// Sistema de recordatorio de turno — avisa al jugador si lleva >20s sin actuar
+let _turnReminderTimer=null;
+const TURN_REMINDER_SEC=20;
+
+// Los mensajes de recordatorio se generan dinámicamente con el nombre del jugador
+function getTurnReminderMsg(){
+  const nombre=MP.mode==='multi'?(MP.myName||'Jugador'):'';
+  const n=nombre?nombre+', ':'';
+  const msgs=[
+    `😅 ¡Ey, ${n.trim()||'jugador'}! Es tu turno, no te quedés dormido...`,
+    `👀 ${n}¡te estamos esperando! ¿Jugás o no?`,
+    `⏰ ${n}¡dale! Los demás están esperando tu jugada.`,
+    `🤔 ${n}¿seguís ahí? ¡Tu turno te llama!`,
+    `😬 Psst, ${n.trim()||'jugador'}... ¡es tu turno! No te distraigas.`,
+  ];
+  return msgs[Math.floor(Math.random()*msgs.length)];
+}
+
+function startTurnReminder(){
+  clearTurnReminder();
+  _turnReminderTimer=setTimeout(()=>{
+    // Verificar que sigue siendo mi turno
+    if(S.phase!=='play'&&S.phase!=='took_discard'&&S.phase!=='drew')return;
+    if(S.cur!==0&&!(MP.mode==='multi'&&S.cur===MP.mySlot))return;
+    if(S.over)return;
+    // Mensaje con tino
+    const msg=getTurnReminderMsg();
+    S.msg=msg;
+    drawMsg();
+    // Volver a notificar
+    notificarMiTurno();
+    // Si sigue sin actuar, repetir cada 20s
+    startTurnReminder();
+  },TURN_REMINDER_SEC*1000);
+}
+
+function clearTurnReminder(){
+  if(_turnReminderTimer){clearTimeout(_turnReminderTimer);_turnReminderTimer=null;}
+}
 function passTurn(){
   clrSel();S.comboThisTurn=false;
   S.cur=(S.cur+1)%S.np;
@@ -1912,13 +1955,14 @@ function passTurn(){
     S.msg=esMiTurno
       ?`${miNombreM}: ¡GOLPEADO! · tomar descarte · tomar del mazo.`
       :`Turno de ${PNAME(S.cur)}...`;
-    if(esMiTurno)notificarMiTurno(); // vibración + sonido
+    if(esMiTurno){notificarMiTurno();startTurnReminder();}
+    else clearTurnReminder();
     mpPublicarEstado();
     redraw();
   } else {
     // modo bots: usar "Tu turno" genérico
-    if(S.cur===0){S.phase='play';S.msg='Tu turno: ¡GOLPEADO! · tomar descarte · tomar del mazo.';redraw();}
-    else{S.phase='bot';S.msg=`Bot ${S.cur} piensa...`;redraw();setTimeout(()=>botTurn(S.cur),850);}
+    if(S.cur===0){S.phase='play';S.msg='Tu turno: ¡GOLPEADO! · tomar descarte · tomar del mazo.';startTurnReminder();redraw();}
+    else{clearTurnReminder();S.phase='bot';S.msg=`Bot ${S.cur} piensa...`;redraw();setTimeout(()=>botTurn(S.cur),850);}
   }
 }
 
@@ -4909,6 +4953,7 @@ function aplicarEstadoRemoto(estado){
       if(eraOtroTurno)notificarMiTurno();
     } else {
       S.msg='Turno de '+PNAME(S.cur)+'...';
+      clearTurnReminder();
     }
   } else if(S.phase==='golpeado_reveal'){
     if(S._revPid===0){
