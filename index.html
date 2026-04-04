@@ -3041,7 +3041,6 @@ function ajustarAbanico(){
     const rot=isSel?0:((i-centro)/centro)*maxRot;
     const lift=isSel?-14:Math.cos(((i-centro)/centro)*(Math.PI/2))*4;
 
-    // Aplicar sin transition para evitar parpadeo en render inicial
     c.style.transition='none';
     c.style.marginRight=isLast?'4px':(isSel?'4px':'-'+Math.round(overlap)+'px');
     c.style.zIndex=isSel?'20':String(i+1);
@@ -3049,9 +3048,14 @@ function ajustarAbanico(){
     c.style.transform=isSel
       ?`translateY(-14px) rotate(0deg)`
       :`translateY(-${Math.round(lift)}px) rotate(${rot.toFixed(1)}deg)`;
-    // Restaurar transition después del paint para que selección sea suave
-    requestAnimationFrame(()=>{c.style.transition='box-shadow .12s,transform .12s,margin-right .12s';});
   });
+  // Un solo timeout para restaurar transition en todas las cartas juntas
+  clearTimeout(ph._fanTimeout);
+  ph._fanTimeout=setTimeout(()=>{
+    [...ph.querySelectorAll('.card.hand-card')].forEach(c=>{
+      c.style.transition='box-shadow .12s,transform .15s,margin-right .15s';
+    });
+  },50);
 }
 function drawActs(){
   const ACT=$('ACT');ACT.innerHTML='';
