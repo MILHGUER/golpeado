@@ -1907,9 +1907,9 @@ function notificarMiTurno(){
 }
 // Sistema de recordatorio de turno — avisa al jugador si lleva >20s sin actuar
 let _turnReminderTimer=null;
+let _turnReminderMsg=''; // mensaje activo del recordatorio — persiste entre redraws
 const TURN_REMINDER_SEC=20;
 
-// Los mensajes de recordatorio se generan dinámicamente con el nombre del jugador
 function getTurnReminderMsg(){
   const nombre=MP.mode==='multi'?(MP.myName||'Jugador'):'';
   const n=nombre?nombre+', ':'';
@@ -1926,23 +1926,22 @@ function getTurnReminderMsg(){
 function startTurnReminder(){
   clearTurnReminder();
   _turnReminderTimer=setTimeout(()=>{
-    // Verificar que sigue siendo mi turno
     if(S.phase!=='play'&&S.phase!=='took_discard'&&S.phase!=='drew')return;
     if(S.cur!==0&&!(MP.mode==='multi'&&S.cur===MP.mySlot))return;
     if(S.over)return;
-    // Mensaje con tino
-    const msg=getTurnReminderMsg();
-    S.msg=msg;
-    drawMsg();
-    // Volver a notificar
+    // Guardar en variable persistente para que redraw() lo siga mostrando
+    _turnReminderMsg=getTurnReminderMsg();
+    S.msg=_turnReminderMsg;
     notificarMiTurno();
-    // Si sigue sin actuar, repetir cada 20s
+    redraw(); // forzar redraw para mostrar el mensaje
+    // Repetir cada 20s mientras siga siendo su turno
     startTurnReminder();
   },TURN_REMINDER_SEC*1000);
 }
 
 function clearTurnReminder(){
   if(_turnReminderTimer){clearTimeout(_turnReminderTimer);_turnReminderTimer=null;}
+  _turnReminderMsg=''; // limpiar mensaje persistente
 }
 function passTurn(){
   clrSel();S.comboThisTurn=false;
@@ -2957,6 +2956,11 @@ function drawCenter(){
 }
 
 function drawMsg(){
+  // Si hay mensaje recordatorio activo, mantenerlo visible
+  if(_turnReminderMsg&&!S.over){
+    const esMiTurnoAhora=(S.cur===0)||(MP.mode==='multi'&&S.cur===MP.mySlot);
+    if(esMiTurnoAhora)S.msg=_turnReminderMsg;
+  }
   const el=$('MSG');
   // en revelación: mostrar tiempo restante para todos si hay timer
   if(S.phase==='golpeado_reveal'&&S._revPid>0){
@@ -5464,25 +5468,8 @@ function voiceStop(skipPublish){
 
 // ── Dibujar botón de voz e indicadores ──
 function drawVoiceUI(){
-  // Botón flotante de WhatsApp para llamada de voz durante el juego
+  // Botón de voz removido — WebRTC no funciona desde GitHub Pages estático
   rmEl('VOICE_BTN');
-  if(MP.mode!=='multi'||!MP.salaId)return;
-  if(S.phase==='shuffle'||S.phase==='dealing')return;
-
-  const btn=document.createElement('button');
-  btn.id='VOICE_BTN';
-  btn.style.cssText=`position:absolute;bottom:70px;right:8px;z-index:850;width:42px;height:42px;border-radius:50%;border:2px solid #25D366;background:rgba(0,0,0,.8);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;-webkit-tap-highlight-color:transparent;box-shadow:0 2px 8px rgba(37,211,102,.3)`;
-  btn.textContent='📞';
-  btn.title='Llamada de voz por WhatsApp';
-  const doWA=()=>{
-    const baseUrl=window.location.origin+window.location.pathname;
-    const enlace=baseUrl+'#sala='+MP.salaId;
-    const msg='🎙️ ¡Hagamos una llamada de voz para jugar GOLPEADO!\nEntrá a la sala: '+enlace;
-    window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
-  };
-  btn.addEventListener('click',doWA);
-  btn.addEventListener('touchend',e=>{e.preventDefault();doWA();},{passive:false});
-  $('G').appendChild(btn);
 }
 
 // ── Indicadores de voz en los bots/jugadores remotos ──
