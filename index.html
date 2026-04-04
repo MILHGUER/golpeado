@@ -1821,7 +1821,7 @@ function refillDeck(callback){
 
 function actDraw(){
   if(S.over||S.cur!==0||S.phase!=='play')return;
-  clearTurnReminder();
+  // No cancelar el reminder aquí — el turno no terminó todavía
   if(!S.deck.length){
     // mazo vacío → refill con descarte y barajar
     if(!S.disc.length){S.msg='¡No quedan cartas!';drawMsg();return;}
@@ -1833,12 +1833,13 @@ function actDraw(){
   clrSel();S.comboThisTurn=false;S.phase='drew';
   mpPublicarEstado();
   S.msg=miNom()+': Tomaste una carta. Mostrá combo o seleccioná 1 carta para descartar.';
+  startTurnReminder(); // reiniciar: el jugador aún debe actuar
   redraw();
 }
 
 function actTakeDisc(){
   if(S.over||S.cur!==0||S.phase!=='play'||!S.disc.length)return;
-  clearTurnReminder();
+  // No cancelar el reminder aquí — el turno no terminó todavía
   const top=S.disc[S.disc.length-1];
   // verificar si puede formar combo ANTES de tomarla
   const hand=S.hands[0];
@@ -1856,6 +1857,7 @@ function actTakeDisc(){
   clrSel();S.sel=[top.id];  // pre-selecciona la carta tomada
   S.comboThisTurn=false;S.phase='took_discard';
   S.msg=miNom()+': Tomaste el descarte. Seleccioná 3+ cartas (incluyendo la tomada) y mostrá combo.';
+  startTurnReminder(); // reiniciar
   redraw();
 }
 
@@ -1869,6 +1871,7 @@ function actShowCombo(){
   S.hands[0]=rmIds(S.hands[0],ids);
   sndCombo();clrSel();S.comboThisTurn=true;S.phase="showed_combo";mpPublicarEstado();
   S.msg=miNom()+': ¡Combo mostrado! Ahora seleccioná 1 carta que no necesites y presioná Descartar.';
+  startTurnReminder(); // reiniciar
   redraw();
 }
 
@@ -1926,7 +1929,7 @@ function getTurnReminderMsg(){
 function startTurnReminder(){
   clearTurnReminder();
   _turnReminderTimer=setTimeout(()=>{
-    if(S.phase!=='play'&&S.phase!=='took_discard'&&S.phase!=='drew')return;
+    if(S.phase!=='play'&&S.phase!=='took_discard'&&S.phase!=='drew'&&S.phase!=='showed_combo')return;
     if(S.cur!==0&&!(MP.mode==='multi'&&S.cur===MP.mySlot))return;
     if(S.over)return;
     // Guardar en variable persistente para que redraw() lo siga mostrando
@@ -4953,8 +4956,8 @@ function aplicarEstadoRemoto(estado){
       const miNomAp=MP.myName||'Tú';
       const eraOtroTurno=S.msg&&!S.msg.startsWith(miNomAp);
       S.msg=`${miNomAp}: ¡GOLPEADO! · tomar descarte · tomar del mazo.`;
-      // Solo notificar si cambió de turno (no repetir en cada redraw)
-      if(eraOtroTurno)notificarMiTurno();
+      // Solo notificar y arrancar reminder si cambió de turno
+      if(eraOtroTurno){notificarMiTurno();startTurnReminder();}
     } else {
       S.msg='Turno de '+PNAME(S.cur)+'...';
       clearTurnReminder();
