@@ -1080,24 +1080,54 @@ function mkHistorialCard(row){
 function showHistorialMesa(row){
   rmEl('HIST_MESA_OV');
   const d=row.datos;
-  if(!d)return;
+  if(!d||!d.jugadores)return;
   const G=$('G');
+
+  // ── Determinar quién va abajo (perspectiva local) ──
+  // 1. Si el nombre guardado en localStorage coincide → ese jugador va abajo
+  // 2. Si no → el host (índice 0) va abajo
+  let miNombreSaved='';try{miNombreSaved=localStorage.getItem('golpeado_nombre')||'';}catch(e){}
+  const miNombreActual=MP.myName||'';
+  const miNombre=miNombreActual||miNombreSaved;
+  let yoIdx=d.jugadores.findIndex(j=>j.nombre===miNombre);
+  if(yoIdx<0)yoIdx=0; // fallback: host abajo
+
+  // Rotar array para que yoIdx quede último (abajo)
+  const np=d.jugadores.length;
+  const rotados=[];
+  for(let i=1;i<np;i++)rotados.push(d.jugadores[(yoIdx+i)%np]);
+  const yo=d.jugadores[yoIdx];
+
+  // ── Colores por posición (igual que PCOLOR pero fijo) ──
+  const HCOLORS=['#C9A84C','#4A9EE8','#E87B4A','#7BE84A'];
+  // El jugador "yo" siempre tiene color índice 0 (dorado)
+  // Los demás toman colores 1,2,3...
+  const colorOf=jug=>{
+    if(jug.nombre===yo.nombre)return HCOLORS[0];
+    const ri=rotados.findIndex(r=>r.nombre===jug.nombre);
+    return HCOLORS[(ri+1)%HCOLORS.length];
+  };
+
   const ov=document.createElement('div');
   ov.id='HIST_MESA_OV';
-  ov.style.cssText='position:absolute;inset:0;border-radius:14px;z-index:890;background:rgba(15,18,22,0.95);display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)';
+  ov.style.cssText='position:absolute;inset:0;border-radius:14px;z-index:890;background:rgba(13,40,20,0.92);display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)';
 
-  // Header con banner de advertencia
+  // Header
+  const ganadorColor=d.tie?'rgba(232,220,200,.7)':'var(--gold)';
   ov.innerHTML=`
-    <div style="background:rgba(40,40,60,0.85);border-bottom:1px solid rgba(232,220,200,.1);padding:9px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0">
-      <span style="font-size:18px">📜</span>
+    <div style="background:rgba(0,0,0,0.55);border-bottom:1px solid rgba(232,220,200,.1);padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:16px">📜</span>
       <div style="flex:1">
-        <div style="font-family:Cinzel,serif;font-size:11px;color:rgba(201,168,76,.9);font-weight:700">PARTIDA HISTÓRICA</div>
-        <div style="font-size:9px;color:rgba(232,220,200,.4)">${historialFechaLabel(row.fecha)} · Sala ${d.sala_id||''}</div>
+        <div style="font-family:Cinzel,serif;font-size:10px;color:rgba(201,168,76,.85);font-weight:700;letter-spacing:.05em">PARTIDA HISTÓRICA — SALA ${d.sala_id||''}</div>
+        <div style="font-size:8px;color:rgba(232,220,200,.35)">${historialFechaLabel(row.fecha)}</div>
       </div>
       <button id="HIST_MESA_CLO" style="background:transparent;border:1px solid rgba(232,220,200,.2);border-radius:6px;color:rgba(232,220,200,.6);font-size:10px;padding:4px 10px;cursor:pointer;font-family:Cinzel,serif;touch-action:manipulation">✕ Cerrar</button>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:10px 10px 20px">
-      <div id="HIST_MESA_BODY"></div>
+    <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
+      <div id="HM_ARRIBA" style="flex-shrink:0;padding:6px 8px;display:flex;gap:6px;flex-wrap:wrap"></div>
+      <div id="HM_RESULTADO" style="flex-shrink:0;padding:4px 8px;text-align:center"></div>
+      <div id="HM_MESA" style="flex:1;padding:4px 8px;overflow-y:auto"></div>
+      <div id="HM_ABAJO" style="flex-shrink:0;padding:6px 8px;background:rgba(0,0,0,0.35);border-top:1px solid rgba(232,220,200,.08)"></div>
     </div>
   `;
   G.appendChild(ov);
@@ -1106,40 +1136,26 @@ function showHistorialMesa(row){
   clo.addEventListener('click',()=>ov.remove());
   clo.addEventListener('touchend',e=>{e.preventDefault();ov.remove();},{passive:false});
 
-  const body=ov.querySelector('#HIST_MESA_BODY');
-
-  // Resultado
-  const ganadorColor=d.tie?'rgba(232,220,200,.7)':'var(--gold)';
-  const resDiv=document.createElement('div');
-  resDiv.style.cssText='text-align:center;padding:10px 0 8px;border-bottom:1px solid rgba(232,220,200,.08);margin-bottom:10px';
-  resDiv.innerHTML=`
-    <div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:${ganadorColor}">${d.tie?'🤝 EMPATE':'🏆 '+d.ganador+' gana'}</div>
-    ${d.golpeador?`<div style="font-size:10px;color:rgba(232,220,200,.5);margin-top:3px">👊 ${d.golpeador} declaró GOLPEADO${d.golpeadorGano?'':' (no ganó)'}</div>`:''}
-    ${d.penalizaciones&&d.penalizaciones.length?`<div style="font-size:9px;color:#E24B4A;margin-top:3px">⚠️ ${d.penalizaciones.map(p=>p.jugador+': '+p.razon).join(' · ')}</div>`:''}
-  `;
-  body.appendChild(resDiv);
-
-  // Mesa de cada jugador
-  d.jugadores.forEach(jug=>{
-    const jugDiv=document.createElement('div');
-    jugDiv.style.cssText='margin-bottom:12px';
-
-    // Header jugador
+  // ── Helper: renderizar sección de un jugador ──
+  function mkJugadorSection(jug,color,esYo){
     const icons=(jug.gano&&!d.tie?' 🏆':'')+(jug.golpeo?' 👊':'')+(jug.penalizado?' ⚠️':'');
-    const headerDiv=document.createElement('div');
-    headerDiv.style.cssText='font-family:Cinzel,serif;font-size:10px;font-weight:700;color:rgba(201,168,76,.85);margin-bottom:5px;display:flex;align-items:center;gap:6px';
-    headerDiv.innerHTML=`<span>${jug.nombre}${icons}</span><span style="font-weight:400;color:rgba(232,220,200,.5);font-size:9px">${jug.puntaje} pts</span>`;
-    jugDiv.appendChild(headerDiv);
+    const wrap=document.createElement('div');
+    wrap.style.cssText=`flex:1;min-width:120px;background:rgba(0,0,0,0.25);border-radius:8px;border:1px solid ${color}44;padding:6px 8px`;
 
-    // Combos mostrados
+    // Nombre
+    const nmDiv=document.createElement('div');
+    nmDiv.style.cssText=`font-family:Cinzel,serif;font-size:9px;font-weight:700;color:${color};margin-bottom:4px;display:flex;align-items:center;gap:4px`;
+    nmDiv.innerHTML=`<span>${jug.nombre}${icons}</span><span style="font-weight:400;color:rgba(232,220,200,.45);font-size:8px">${jug.puntaje}pts</span>`;
+
+    wrap.appendChild(nmDiv);
+
+    // Combos
     if(jug.combos&&jug.combos.length){
-      const combosDiv=document.createElement('div');
-      combosDiv.innerHTML='<div class="hist-label">Combos en mesa</div>';
       const combosRow=document.createElement('div');
-      combosRow.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
+      combosRow.style.cssText='display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px';
       jug.combos.forEach(combo=>{
         const cset=document.createElement('div');
-        cset.style.cssText='display:flex;gap:1px;padding:3px;background:rgba(0,0,0,.25);border-radius:5px;border:1px solid rgba(232,220,200,.1)';
+        cset.style.cssText=`display:flex;gap:1px;padding:2px;border-radius:4px;background:rgba(0,0,0,.3);border:1px solid ${color}33`;
         const ordCards=combo.order||combo.cards;
         ordCards.forEach(c=>{
           const ce=mkFace(c,false);
@@ -1149,42 +1165,73 @@ function showHistorialMesa(row){
         });
         combosRow.appendChild(cset);
       });
-      combosDiv.appendChild(combosRow);
-      jugDiv.appendChild(combosDiv);
+      wrap.appendChild(combosRow);
     }
 
-    // Cartas sobrantes
+    // Sobrantes
     if(jug.sobrantes&&jug.sobrantes.length){
-      const sobDiv=document.createElement('div');
-      sobDiv.style.marginTop='6px';
-      sobDiv.innerHTML='<div class="hist-label">Sobrantes ('+jug.sobrantes.length+' cartas)</div>';
+      const sobLbl=document.createElement('div');
+      sobLbl.style.cssText='font-size:7px;color:rgba(232,220,200,.35);font-family:Cinzel,serif;margin-bottom:2px';
+      sobLbl.textContent='SOBRANTES';
+      wrap.appendChild(sobLbl);
       const sobRow=document.createElement('div');
-      sobRow.style.cssText='display:flex;flex-wrap:wrap;gap:3px';
+      sobRow.style.cssText='display:flex;flex-wrap:wrap;gap:2px';
       jug.sobrantes.forEach(c=>{
         const ce=mkFace(c,false);
         ce.style.cursor='default';
         ce.style.position='relative';
-        ce.style.opacity='0.8';
+        ce.style.opacity='0.85';
         const x=document.createElement('div');
-        x.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;color:rgba(210,30,30,.85);font-weight:900;pointer-events:none;z-index:2';
+        x.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;color:rgba(210,30,30,.85);font-weight:900;pointer-events:none;z-index:2';
         x.textContent='✕';
         ce.appendChild(x);
         sobRow.appendChild(ce);
       });
-      sobDiv.appendChild(sobRow);
-      jugDiv.appendChild(sobDiv);
-    } else if(jug.combos&&jug.combos.length){
-      const sinSob=document.createElement('div');
-      sinSob.style.cssText='font-size:9px;color:#7be87b;margin-top:4px';
-      sinSob.textContent='✓ Sin sobrantes';
-      jugDiv.appendChild(sinSob);
+      wrap.appendChild(sobRow);
+    } else {
+      const ok=document.createElement('div');
+      ok.style.cssText='font-size:8px;color:#7be87b';
+      ok.textContent='✓ Sin sobrantes';
+      wrap.appendChild(ok);
     }
+    return wrap;
+  }
 
-    const sep=document.createElement('div');
-    sep.style.cssText='border-bottom:1px solid rgba(232,220,200,.06);margin-top:10px';
-    jugDiv.appendChild(sep);
-    body.appendChild(jugDiv);
+  // ── Sección ARRIBA — jugadores remotos ──
+  const arriba=ov.querySelector('#HM_ARRIBA');
+  rotados.forEach((jug,ri)=>{
+    arriba.appendChild(mkJugadorSection(jug,colorOf(jug),false));
   });
+
+  // ── Resultado central ──
+  // Calcular total ganado por el ganador
+  const resDiv=ov.querySelector('#HM_RESULTADO');
+  let apuestaInfo='';
+  if(!d.tie&&d.apuesta>0){
+    const nPerd=d.jugadores.length-1;
+    // ganador cobra de cada perdedor: monto normal o doble si penalizado
+    let totalCobrado=0;
+    d.jugadores.forEach(jug=>{
+      if(jug.nombre===d.ganador)return;
+      const penalizado=d.penalizaciones&&d.penalizaciones.some(p=>p.jugador===jug.nombre);
+      totalCobrado+=penalizado?d.apuesta*2:d.apuesta;
+    });
+    apuestaInfo=`<div style="font-size:9px;color:rgba(201,168,76,.7);margin-top:2px">💰 Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} por jugador · ${d.ganador} cobró ${totalCobrado} ficha${totalCobrado>1?'s':''}</div>`;
+  } else if(d.tie&&d.apuesta>0){
+    apuestaInfo=`<div style="font-size:9px;color:rgba(232,220,200,.45);margin-top:2px">💰 Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} — devueltas por empate</div>`;
+  }
+  resDiv.innerHTML=`
+    <div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:${ganadorColor}">${d.tie?'🤝 EMPATE':'🏆 '+d.ganador+' gana'}</div>
+    <div style="font-size:9px;color:rgba(232,220,200,.6);margin-top:3px">${d.jugadores.map(j=>`<span style="color:${j.gano&&!d.tie?'var(--gold)':'rgba(232,220,200,.6)'};font-weight:${j.gano&&!d.tie?'700':'400'}">${j.nombre} ${j.puntaje}pts${j.gano&&!d.tie?' 🏆':''}</span>`).join(' · ')}</div>
+    ${d.golpeador?`<div style="font-size:9px;color:rgba(232,220,200,.45);margin-top:2px">👊 ${d.golpeador}${d.golpeadorGano?'':' (no ganó)'}</div>`:''}
+    ${d.penalizaciones&&d.penalizaciones.length?`<div style="font-size:8px;color:#E24B4A;margin-top:2px">⚠️ ${d.penalizaciones.map(p=>p.jugador+': '+p.razon).join(' · ')}</div>`:''}
+    ${apuestaInfo}
+    <div style="font-size:8px;color:rgba(232,220,200,.25);margin-top:3px;font-family:Cinzel,serif;letter-spacing:.04em">📜 HISTORIAL · ${historialFechaLabel(row.fecha)}</div>
+  `;
+
+  // ── Sección ABAJO — jugador local (yo) ──
+  const abajo=ov.querySelector('#HM_ABAJO');
+  abajo.appendChild(mkJugadorSection(yo,colorOf(yo),true));
 }
 
 async function showHistorialOv(salaIdInicial=''){
