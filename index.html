@@ -236,6 +236,39 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 .winner-name{font-family:Cinzel,serif;font-size:22px;font-weight:700;text-align:center;text-shadow:0 2px 12px rgba(0,0,0,.8)}
 .winner-sub{font-family:Cinzel,serif;font-size:12px;opacity:.75;text-align:center}
 .spark{position:absolute;width:8px;height:8px;border-radius:50%;animation:spark .9s ease-out forwards;}
+/* ── Historial ── */
+#HIST_OV{
+  position:absolute;inset:0;border-radius:14px;z-index:880;
+  background:rgba(18,18,24,0.93);
+  display:flex;flex-direction:column;
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+}
+.hist-banner{
+  background:rgba(60,60,80,0.7);border-bottom:1px solid rgba(232,220,200,.12);
+  padding:10px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+.hist-body{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;}
+.hist-card{
+  background:rgba(255,255,255,.04);border:1px solid rgba(232,220,200,.1);
+  border-radius:8px;padding:10px 12px;cursor:pointer;transition:background .15s;
+}
+.hist-card:active{background:rgba(255,255,255,.08);}
+.hist-mesa-wrap{
+  background:rgba(13,59,31,0.55);border:1px solid rgba(232,220,200,.1);
+  border-radius:8px;padding:8px;
+}
+.hist-label{
+  font-family:Cinzel,serif;font-size:8px;color:rgba(232,220,200,.4);
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;
+}
+#HIST_SEARCH{
+  width:100%;padding:8px 12px;border-radius:7px;
+  border:1.5px solid rgba(201,168,76,.35);
+  background:rgba(0,0,0,.4);color:#e8dcc8;
+  font-family:Cinzel,serif;font-size:12px;outline:none;
+  text-transform:uppercase;letter-spacing:.05em;
+}
 @keyframes challengePulse{0%,100%{transform:scale(1) rotate(-4deg)}50%{transform:scale(1.2) rotate(4deg)}}
 @keyframes penaltyIn{
   0%{transform:scale(0.1) rotate(10deg);opacity:0}
@@ -286,6 +319,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 <div id="G">
   <div class="border"></div>
   <button id="CUENTAS_BTN" onclick="showCuentas()" ontouchend="e=>{e.preventDefault();showCuentas()}">💰 Cuentas</button>
+  <button id="HIST_BTN" onclick="showHistorialOv(typeof MP!=='undefined'?MP.salaId||'':'')" ontouchend="event.preventDefault();showHistorialOv(typeof MP!=='undefined'?MP.salaId||'':'')" style="position:absolute;top:6px;right:72px;z-index:50;font-family:'Cinzel',serif;font-size:8px;color:rgba(232,220,200,.4);border:1px solid rgba(232,220,200,.15);background:transparent;border-radius:4px;padding:2px 6px;cursor:pointer;touch-action:manipulation">📜 Historial</button>
   <div id="BR"></div>
   <div class="czone" style="flex:1;min-height:0">
     <div id="TC"></div>
@@ -926,6 +960,296 @@ function showWinnerAnimation(callback){
   },2800);
 }
 
+
+// ══════════════════════════════════════════════════════════
+// HISTORIAL DE PARTIDAS
+// ══════════════════════════════════════════════════════════
+
+async function historialGuardar(){
+  if(MP.mode!=='multi'||!MP.isHost)return; // solo host guarda
+  try{
+    const scores=S.hands.map(h=>h.reduce((a,c)=>a+cv(c),0));
+    const adj=scores.map((s,i)=>s+(usedBothWilds(i)?60:0));
+    const min=Math.min(...adj);
+    const winners=adj.map((s,i)=>s===min?i:-1).filter(i=>i>=0);
+    const tie=winners.length>1;
+    const gp=S.golpBy;
+    const gWon=gp>=0&&adj[gp]===min&&!tie;
+
+    // Serializar cartas (solo lo necesario para mostrar)
+    const serCard=c=>({n:c.n,s:c.s,jk:c.jk||false,wl:c.wl||false,_fittedBy:c._fittedBy});
+    const serCombo=combo=>({
+      cards:combo.cards.map(serCard),
+      order:combo.order?combo.order.map(serCard):null,
+      type:combo.type
+    });
+
+    const penalizaciones=[];
+    for(let i=0;i<S.np;i++){
+      if(tie)continue;
+      const golpoSinGanar=gp===i&&!gWon;
+      const tieneComodines=usedBothWilds(i);
+      if(golpoSinGanar||tieneComodines){
+        penalizaciones.push({
+          jugador:PNAME(i),
+          razon:golpoSinGanar?'Golpeó sin ganar':'Usó ambos comodines'
+        });
+      }
+    }
+
+    const datos={
+      sala_id:MP.salaId,
+      jugadores:Array.from({length:S.np},(_,i)=>({
+        nombre:PNAME(i),
+        puntaje:adj[i],
+        sobrantes:S.hands[i].map(serCard),
+        combos:S.shown[i].map(serCombo),
+        gano:winners.includes(i)&&!tie,
+        golpeo:gp===i,
+        penalizado:penalizaciones.some(p=>p.jugador===PNAME(i))
+      })),
+      ganador:tie?'EMPATE':PNAME(winners[0]),
+      tie,
+      apuesta:BET,
+      penalizaciones,
+      golpeador:gp>=0?PNAME(gp):null,
+      golpeadorGano:gWon
+    };
+
+    await sbFetch('/rest/v1/historial','POST',{
+      sala_id:MP.salaId,
+      datos:datos
+    });
+
+    // Limpiar historial antiguo de esta sala (mantener últimas 20)
+    try{
+      const all=await sbFetch('/rest/v1/historial?sala_id=eq.'+MP.salaId+'&select=id&order=fecha.asc');
+      if(all&&all.length>20){
+        const toDelete=all.slice(0,all.length-20);
+        for(const r of toDelete){
+          await sbFetch('/rest/v1/historial?id=eq.'+r.id,'DELETE');
+        }
+      }
+    }catch(e){}
+  }catch(e){console.log('historial error:',e);}
+}
+
+async function historialCargar(salaId,offset=0){
+  try{
+    const rows=await sbFetch(
+      '/rest/v1/historial?sala_id=eq.'+encodeURIComponent(salaId)+
+      '&select=id,fecha,datos&order=fecha.desc&limit=15&offset='+offset
+    );
+    return rows||[];
+  }catch(e){return [];}
+}
+
+function historialFechaLabel(fechaStr){
+  try{
+    const d=new Date(fechaStr);
+    return d.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'})+
+      ' '+d.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){return fechaStr||'';}
+}
+
+function mkHistorialCard(row){
+  const d=row.datos;
+  if(!d)return null;
+  const ganadorColor=d.tie?'rgba(232,220,200,.6)':'var(--gold)';
+  const ganadorText=d.tie?'🤝 Empate':'🏆 '+d.ganador;
+  const jugLista=d.jugadores.map(j=>{
+    const pts=j.puntaje;
+    const icons=(j.gano&&!d.tie?'🏆':'')+(j.golpeo?' 👊':'')+(j.penalizado?' ⚠️':'');
+    return `<span style="color:rgba(232,220,200,.8)">${j.nombre}${icons} <span style="color:rgba(232,220,200,.5)">${pts}pts</span></span>`;
+  }).join(' · ');
+  const div=document.createElement('div');
+  div.className='hist-card';
+  div.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+      <span style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:${ganadorColor}">${ganadorText}</span>
+      <span style="font-size:9px;color:rgba(232,220,200,.35)">${historialFechaLabel(row.fecha)}</span>
+    </div>
+    <div style="font-size:9px;color:rgba(232,220,200,.6);line-height:1.6">${jugLista}</div>
+    ${d.apuesta>0?`<div style="font-size:8px;color:rgba(201,168,76,.5);margin-top:3px">Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} por jugador</div>`:''}
+  `;
+  div.addEventListener('click',()=>showHistorialMesa(row));
+  div.addEventListener('touchend',e=>{e.preventDefault();showHistorialMesa(row);},{passive:false});
+  return div;
+}
+
+function showHistorialMesa(row){
+  rmEl('HIST_MESA_OV');
+  const d=row.datos;
+  if(!d)return;
+  const G=$('G');
+  const ov=document.createElement('div');
+  ov.id='HIST_MESA_OV';
+  ov.style.cssText='position:absolute;inset:0;border-radius:14px;z-index:890;background:rgba(15,18,22,0.95);display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)';
+
+  // Header con banner de advertencia
+  ov.innerHTML=`
+    <div style="background:rgba(40,40,60,0.85);border-bottom:1px solid rgba(232,220,200,.1);padding:9px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:18px">📜</span>
+      <div style="flex:1">
+        <div style="font-family:Cinzel,serif;font-size:11px;color:rgba(201,168,76,.9);font-weight:700">PARTIDA HISTÓRICA</div>
+        <div style="font-size:9px;color:rgba(232,220,200,.4)">${historialFechaLabel(row.fecha)} · Sala ${d.sala_id||''}</div>
+      </div>
+      <button id="HIST_MESA_CLO" style="background:transparent;border:1px solid rgba(232,220,200,.2);border-radius:6px;color:rgba(232,220,200,.6);font-size:10px;padding:4px 10px;cursor:pointer;font-family:Cinzel,serif;touch-action:manipulation">✕ Cerrar</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:10px 10px 20px">
+      <div id="HIST_MESA_BODY"></div>
+    </div>
+  `;
+  G.appendChild(ov);
+
+  const clo=ov.querySelector('#HIST_MESA_CLO');
+  clo.addEventListener('click',()=>ov.remove());
+  clo.addEventListener('touchend',e=>{e.preventDefault();ov.remove();},{passive:false});
+
+  const body=ov.querySelector('#HIST_MESA_BODY');
+
+  // Resultado
+  const ganadorColor=d.tie?'rgba(232,220,200,.7)':'var(--gold)';
+  const resDiv=document.createElement('div');
+  resDiv.style.cssText='text-align:center;padding:10px 0 8px;border-bottom:1px solid rgba(232,220,200,.08);margin-bottom:10px';
+  resDiv.innerHTML=`
+    <div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:${ganadorColor}">${d.tie?'🤝 EMPATE':'🏆 '+d.ganador+' gana'}</div>
+    ${d.golpeador?`<div style="font-size:10px;color:rgba(232,220,200,.5);margin-top:3px">👊 ${d.golpeador} declaró GOLPEADO${d.golpeadorGano?'':' (no ganó)'}</div>`:''}
+    ${d.penalizaciones&&d.penalizaciones.length?`<div style="font-size:9px;color:#E24B4A;margin-top:3px">⚠️ ${d.penalizaciones.map(p=>p.jugador+': '+p.razon).join(' · ')}</div>`:''}
+  `;
+  body.appendChild(resDiv);
+
+  // Mesa de cada jugador
+  d.jugadores.forEach(jug=>{
+    const jugDiv=document.createElement('div');
+    jugDiv.style.cssText='margin-bottom:12px';
+
+    // Header jugador
+    const icons=(jug.gano&&!d.tie?' 🏆':'')+(jug.golpeo?' 👊':'')+(jug.penalizado?' ⚠️':'');
+    const headerDiv=document.createElement('div');
+    headerDiv.style.cssText='font-family:Cinzel,serif;font-size:10px;font-weight:700;color:rgba(201,168,76,.85);margin-bottom:5px;display:flex;align-items:center;gap:6px';
+    headerDiv.innerHTML=`<span>${jug.nombre}${icons}</span><span style="font-weight:400;color:rgba(232,220,200,.5);font-size:9px">${jug.puntaje} pts</span>`;
+    jugDiv.appendChild(headerDiv);
+
+    // Combos mostrados
+    if(jug.combos&&jug.combos.length){
+      const combosDiv=document.createElement('div');
+      combosDiv.innerHTML='<div class="hist-label">Combos en mesa</div>';
+      const combosRow=document.createElement('div');
+      combosRow.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
+      jug.combos.forEach(combo=>{
+        const cset=document.createElement('div');
+        cset.style.cssText='display:flex;gap:1px;padding:3px;background:rgba(0,0,0,.25);border-radius:5px;border:1px solid rgba(232,220,200,.1)';
+        const ordCards=combo.order||combo.cards;
+        ordCards.forEach(c=>{
+          const ce=mkFace(c,false);
+          ce.style.cursor='default';
+          ce.style.transform='none';
+          cset.appendChild(ce);
+        });
+        combosRow.appendChild(cset);
+      });
+      combosDiv.appendChild(combosRow);
+      jugDiv.appendChild(combosDiv);
+    }
+
+    // Cartas sobrantes
+    if(jug.sobrantes&&jug.sobrantes.length){
+      const sobDiv=document.createElement('div');
+      sobDiv.style.marginTop='6px';
+      sobDiv.innerHTML='<div class="hist-label">Sobrantes ('+jug.sobrantes.length+' cartas)</div>';
+      const sobRow=document.createElement('div');
+      sobRow.style.cssText='display:flex;flex-wrap:wrap;gap:3px';
+      jug.sobrantes.forEach(c=>{
+        const ce=mkFace(c,false);
+        ce.style.cursor='default';
+        ce.style.position='relative';
+        ce.style.opacity='0.8';
+        const x=document.createElement('div');
+        x.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;color:rgba(210,30,30,.85);font-weight:900;pointer-events:none;z-index:2';
+        x.textContent='✕';
+        ce.appendChild(x);
+        sobRow.appendChild(ce);
+      });
+      sobDiv.appendChild(sobRow);
+      jugDiv.appendChild(sobDiv);
+    } else if(jug.combos&&jug.combos.length){
+      const sinSob=document.createElement('div');
+      sinSob.style.cssText='font-size:9px;color:#7be87b;margin-top:4px';
+      sinSob.textContent='✓ Sin sobrantes';
+      jugDiv.appendChild(sinSob);
+    }
+
+    const sep=document.createElement('div');
+    sep.style.cssText='border-bottom:1px solid rgba(232,220,200,.06);margin-top:10px';
+    jugDiv.appendChild(sep);
+    body.appendChild(jugDiv);
+  });
+}
+
+async function showHistorialOv(salaIdInicial=''){
+  rmEl('HIST_OV');
+  const G=$('G');
+  const ov=document.createElement('div');
+  ov.id='HIST_OV';
+
+  ov.innerHTML=`
+    <div class="hist-banner">
+      <span style="font-size:20px">📜</span>
+      <div style="flex:1;font-family:Cinzel,serif;font-size:13px;font-weight:700;color:rgba(232,220,200,.9)">Historial de partidas</div>
+      <button id="HIST_CLO" style="background:transparent;border:1px solid rgba(232,220,200,.2);border-radius:6px;color:rgba(232,220,200,.6);font-size:10px;padding:5px 12px;cursor:pointer;font-family:Cinzel,serif;touch-action:manipulation">✕ Cerrar</button>
+    </div>
+    <div style="padding:10px 12px;border-bottom:1px solid rgba(232,220,200,.08);flex-shrink:0">
+      <input id="HIST_SEARCH" placeholder="CÓDIGO DE SALA (ej: AB12CD)" maxlength="8" value="${salaIdInicial.toUpperCase()}">
+      <button id="HIST_BUSCAR" style="width:100%;margin-top:7px;padding:8px;border-radius:7px;border:1.5px solid rgba(201,168,76,.5);background:transparent;color:var(--gold);font-family:Cinzel,serif;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation">🔍 Buscar partidas</button>
+    </div>
+    <div class="hist-body" id="HIST_BODY">
+      <div style="text-align:center;color:rgba(232,220,200,.3);font-size:11px;padding:30px 0">
+        Ingresá el código de sala y presioná Buscar
+      </div>
+    </div>
+  `;
+
+  G.appendChild(ov);
+
+  const clo=ov.querySelector('#HIST_CLO');
+  clo.addEventListener('click',()=>ov.remove());
+  clo.addEventListener('touchend',e=>{e.preventDefault();ov.remove();},{passive:false});
+
+  const searchInput=ov.querySelector('#HIST_SEARCH');
+  searchInput.addEventListener('input',()=>{searchInput.value=searchInput.value.toUpperCase();});
+
+  const buscar=async()=>{
+    const sala=(searchInput.value||'').trim().toUpperCase();
+    if(!sala){return;}
+    const body=ov.querySelector('#HIST_BODY');
+    body.innerHTML='<div style="text-align:center;color:rgba(232,220,200,.4);font-size:11px;padding:20px">Cargando...</div>';
+    const rows=await historialCargar(sala);
+    body.innerHTML='';
+    if(!rows.length){
+      body.innerHTML='<div style="text-align:center;color:rgba(232,220,200,.3);font-size:11px;padding:30px 0">No hay partidas registradas para esta sala</div>';
+      return;
+    }
+    const titulo=document.createElement('div');
+    titulo.style.cssText='font-size:9px;color:rgba(232,220,200,.35);font-family:Cinzel,serif;margin-bottom:6px';
+    titulo.textContent=rows.length+' partida'+(rows.length!==1?'s':'')+' encontrada'+(rows.length!==1?'s':'')+' — toca una para ver la mesa';
+    body.appendChild(titulo);
+    rows.forEach(row=>{
+      const card=mkHistorialCard(row);
+      if(card)body.appendChild(card);
+    });
+  };
+
+  const buscarBtn=ov.querySelector('#HIST_BUSCAR');
+  buscarBtn.addEventListener('click',buscar);
+  buscarBtn.addEventListener('touchend',e=>{e.preventDefault();buscar();},{passive:false});
+  searchInput.addEventListener('keydown',e=>{if(e.key==='Enter')buscar();});
+
+  // Si ya hay sala, buscar automáticamente
+  if(salaIdInicial){
+    await buscar();
+  }
+}
 function showPenaltyAnimation(penalties,callback){
   if(!penalties.length){callback();return;}
   playPenaltySound();
@@ -1576,7 +1900,7 @@ function startGame(){
   undoClear();
   clearTurnReminder();
   if(_autoListoTimer){clearTimeout(_autoListoTimer);_autoListoTimer=null;S._autoListoSegs=undefined;}
-  Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_verResSegs:0,_rachaProcessed:false,_pagoProcessed:false});
+  Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_verResSegs:0,_rachaProcessed:false,_pagoProcessed:false,_historialGuardado:false});
   redraw();
   showBetScreen(); // primero apuesta, luego baraja
 }
@@ -3560,6 +3884,7 @@ function showFinalOv(){
       <button class="btn" id="OV_CUENTAS_BTN" style="flex:1;min-width:60px">💰 Cuentas</button>
       ${MP.mode==='solo'?`<button class="btn" id="OV_RANK_BTN" style="flex:1;min-width:60px">🏆 Ranking</button>`:''}
       <button class="btn" id="OV_MESA_BTN" style="flex:1;min-width:60px">🃏 Ver mesa</button>
+      ${MP.mode==='multi'?`<button class="btn" id="OV_HIST_BTN" style="flex:1;min-width:60px">📜 Historial</button>`:''}
       <button class="btn pri" id="OV_NUEVA_BTN" style="flex:2;min-width:80px;transition:opacity .3s"
         ${needsCountdown?'disabled':''}>
         ${needsCountdown?`⏳ Nueva partida (${COUNTDOWN_SECS}s)`:'Nueva partida'}
@@ -3594,6 +3919,12 @@ function showFinalOv(){
     mesaBtn.addEventListener('click',doMesa);
     mesaBtn.addEventListener('touchend',e=>{e.preventDefault();doMesa();},{passive:false});
   }
+  const histOvBtn=ov.querySelector('#OV_HIST_BTN');
+  if(histOvBtn){
+    const doHist=()=>showHistorialOv(MP.salaId||'');
+    histOvBtn.addEventListener('click',doHist);
+    histOvBtn.addEventListener('touchend',e=>{e.preventDefault();doHist();},{passive:false});
+  }
 
   // Countdown solo en multijugador
   if(needsCountdown){
@@ -3614,6 +3945,12 @@ function showFinalOv(){
   }
 
   $('G').appendChild(ov);
+
+  // Guardar historial al terminar partida multi
+  if(MP.mode==='multi'&&!S._historialGuardado){
+    S._historialGuardado=true;
+    historialGuardar().catch(()=>{});
+  }
 
   // Procesar racha solo UNA VEZ por partida
   if(MP.mode==='solo'&&!S._rachaProcessed){
@@ -3921,6 +4258,9 @@ function showModeScreen(){
       <button id="MS_UNIR" style="padding:14px;border-radius:8px;border:2px solid rgba(232,220,200,.4);background:transparent;color:rgba(232,220,200,.8);font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">
         🔗 Unirse a sala
       </button>
+      <button id="MS_HIST" style="padding:10px;border-radius:8px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.45);font-family:Cinzel,serif;font-size:11px;cursor:pointer;touch-action:manipulation">
+        📜 Ver historial de sala
+      </button>
     </div>`;
   $('G').appendChild(ov);
   const solo=ov.querySelector('#MS_SOLO');
@@ -3932,6 +4272,8 @@ function showModeScreen(){
 
   tap(crear,()=>showNombreScreen('crear'));
   tap(unir,()=>showNombreScreen('unir'));
+  const hist=ov.querySelector('#MS_HIST');
+  if(hist)tap(hist,()=>showHistorialOv(''));
 }
 
 // ── PANTALLA DE NOMBRE ──
@@ -4686,6 +5028,7 @@ function buildLobbyUI(estado,isHost){
     <div style="display:flex;gap:6px;width:100%;max-width:300px;margin-top:4px;flex-wrap:wrap">
       <button id="LB_BACK" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.4);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">✏️ Nombre</button>
       <button id="LB_INICIO" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(74,158,232,.4);background:rgba(74,158,232,.08);color:rgba(74,158,232,.9);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">🏠 Inicio</button>
+      <button id="LB_HIST" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.15);background:transparent;color:rgba(232,220,200,.4);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">📜 Historial</button>
       <button id="LB_HTP" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">❓ Cómo jugar</button>
       <button id="LB_CUE" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(201,168,76,.4);background:transparent;color:rgba(201,168,76,.7);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">💰 Cuentas</button>
     </div>`;
@@ -4711,6 +5054,12 @@ function buildLobbyUI(estado,isHost){
     const doInicio=()=>volverAlMenu();
     inicioBtn.addEventListener('click',doInicio);
     inicioBtn.addEventListener('touchend',e=>{e.preventDefault();doInicio();},{passive:false});
+  }
+  const lbHistBtn=ov.querySelector('#LB_HIST');
+  if(lbHistBtn){
+    const doLbHist=()=>showHistorialOv(MP.salaId||'');
+    lbHistBtn.addEventListener('click',doLbHist);
+    lbHistBtn.addEventListener('touchend',e=>{e.preventDefault();doLbHist();},{passive:false});
   }
   const htpBtn=ov.querySelector('#LB_HTP');
   if(htpBtn){const doHtp=()=>showHowToPlay();htpBtn.addEventListener('click',doHtp);htpBtn.addEventListener('touchend',e=>{e.preventDefault();doHtp();},{passive:false});}
@@ -5646,8 +5995,12 @@ function voiceStop(skipPublish){
 
 // ── Dibujar botón de voz e indicadores ──
 function drawVoiceUI(){
-  // Botón de voz removido — WebRTC no funciona desde GitHub Pages estático
   rmEl('VOICE_BTN');
+  // Mostrar botón historial solo en multijugador
+  const histBtn=document.getElementById('HIST_BTN');
+  if(histBtn){
+    histBtn.style.display=(MP.mode==='multi'&&MP.salaId)?'block':'none';
+  }
 }
 
 // ── Indicadores de voz en los bots/jugadores remotos ──
