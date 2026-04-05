@@ -336,13 +336,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
       <div class="plbl">Tu mano — toca para seleccionar · arrastra para ordenar <span id="MY_VOICE_IND" style="font-size:13px"></span></div>
       <button id="SORT_BTN" ontouchend="event.preventDefault();sortHand()" onclick="sortHand()" style="font-family:Cinzel,serif;font-size:8px;color:rgba(201,168,76,.6);border:1px solid rgba(201,168,76,.25);background:transparent;border-radius:4px;padding:2px 7px;cursor:pointer;white-space:nowrap;touch-action:manipulation;flex-shrink:0">⇕ Ordenar</button>
     </div>
-    <div style="position:relative">
-      <div class="hwrap"><div id="PH"></div></div>
-      <!-- overlay bloqueante solo cuando bloquea (fase play) -->
-      <div id="HAND_GUIDE_BLOCK" style="display:none;position:absolute;inset:0;border-radius:8px;align-items:center;justify-content:center;padding:8px 10px;text-align:center;z-index:30;pointer-events:all"></div>
-    </div>
-    <!-- mensaje informativo debajo de la mano, no bloquea -->
-    <div id="HAND_GUIDE" style="display:none;padding:5px 10px;text-align:center;border-radius:6px;margin:2px 4px 0"></div>
+    <div class="hwrap"><div id="PH"></div></div>
+    <div id="HAND_GUIDE" style="display:none;padding:4px 8px;border-radius:5px;margin:2px 4px 0"></div>
     <div id="HAND_PTS" style="font-size:10px;text-align:center;min-height:14px;padding:2px 0;font-family:Cinzel,serif"></div>
   </div>
 </div>
@@ -2249,6 +2244,7 @@ function showGolpeAnimation(playerName,callback){
 function actGolpe(){
   if(S.over||S.cur!==0||S.phase!=='play')return;
   clearTurnReminder();
+  hideHandGuide();
   // pedir confirmación antes de declarar GOLPEADO
   rmEl('GOLPE_CONF');
   const d=document.createElement('div');d.id='GOLPE_CONF';
@@ -2329,7 +2325,7 @@ function actDraw(){
   redraw();
   // Mensaje temporal sobre la mano — ahora sí pueden seleccionar
   const nomDraw=MP.mode==='multi'?(MP.myName||'Jugador'):'Jugador';
-  showHandGuide('✓ Ahora podés seleccionar tus cartas, armar combo o descartar una','rgba(74,158,232,.9)',false,3000);
+  showHandGuide('Podés armar un combo u ordenar tus naipes, pero principalmente seleccioná la carta que no necesites y presioná Descartar para continuar con el juego','rgba(74,158,232,.9)',false,0);
 }
 
 function actTakeDisc(){
@@ -2357,7 +2353,7 @@ function actTakeDisc(){
   // Mensaje temporal guía
   const nomDisc=MP.mode==='multi'?(MP.myName||'Jugador'):'Jugador';
   const cartaDesc=S.disc.length?'':'la carta tomada';
-  showHandGuide('Seleccioná 3+ cartas incluyendo la carta que tomaste del descarte, luego presioná "Mostrar combinación"','rgba(201,168,76,.9)',false,4500);
+  showHandGuide('Seleccioná 3+ cartas incluyendo la carta que tomaste del descarte, luego presioná "Mostrar combinación"','rgba(201,168,76,.9)',false,0);
 }
 
 function actShowCombo(){
@@ -2372,7 +2368,7 @@ function actShowCombo(){
   S.msg=miNom()+': ¡Combo mostrado! Ahora seleccioná 1 carta que no necesites y presioná Descartar.';
   startTurnReminder();
   redraw();
-  showHandGuide('¡Combo en mesa! Ahora seleccioná 1 carta que no necesites y presioná Descartar','rgba(123,232,123,.85)',false,3500);
+  showHandGuide('¡Combo en mesa! Ahora seleccioná 1 carta que no necesites y presioná Descartar','rgba(123,232,123,.85)',false,0);
 }
 
 function actDiscard(){
@@ -2384,8 +2380,9 @@ function actDiscard(){
   S.disc.push(card);
   sndDiscard();
   clrSel();S.comboThisTurn=false;
+  hideHandGuide(); // turno terminó — ocultar guía
   passTurn();
-  mpPublicarEstado(); // publicar después de passTurn que actualiza S.cur
+  mpPublicarEstado();
 }
 
 // TURN FLOW
@@ -3511,55 +3508,36 @@ function drawMsg(){
 // Overlay de guía sobre la mano del jugador
 let _handGuideTimer=null;
 function showHandGuide(msg,color,bloqueaCartas,duracion){
+  // Siempre debajo de la mano, nunca bloquea — naipes siempre libres
   clearTimeout(_handGuideTimer);
-  if(bloqueaCartas){
-    // Overlay encima de las cartas — bloquea interacción (fase play)
-    const block=document.getElementById('HAND_GUIDE_BLOCK');
-    if(block){
-      block.style.display='flex';
-      block.style.background='rgba(0,0,0,0.68)';
-      block.style.border='1.5px solid '+(color||'rgba(201,168,76,.5)');
-      block.style.borderRadius='8px';
-      block.innerHTML=`<div style="font-family:Cinzel,serif;font-size:10px;color:${color||'var(--gold)'};line-height:1.5;font-weight:600">${msg}</div>`;
-    }
-    const guide=document.getElementById('HAND_GUIDE');
-    if(guide)guide.style.display='none';
-  } else {
-    // Mensaje informativo DEBAJO de la mano — no tapa las cartas
-    const block=document.getElementById('HAND_GUIDE_BLOCK');
-    if(block)block.style.display='none';
-    const guide=document.getElementById('HAND_GUIDE');
-    if(guide){
-      guide.style.display='block';
-      guide.style.background='rgba(0,0,0,0.4)';
-      guide.style.border='1px solid '+(color||'rgba(201,168,76,.3)');
-      guide.innerHTML=`<div style="font-family:Cinzel,serif;font-size:9px;color:${color||'rgba(232,220,200,.8)'};line-height:1.5">${msg}</div>`;
-    }
-    if(duracion>0){
-      _handGuideTimer=setTimeout(()=>hideHandGuide(),duracion);
-    }
+  const guide=document.getElementById('HAND_GUIDE');
+  if(!guide)return;
+  guide.style.display='block';
+  guide.style.background='rgba(0,0,0,0.45)';
+  guide.style.border='1px solid '+(color||'rgba(201,168,76,.3)');
+  guide.innerHTML=`<span style="font-family:Cinzel,serif;font-size:9px;color:${color||'rgba(232,220,200,.8)'};line-height:1.5">${msg}</span>`;
+  if(duracion>0){
+    _handGuideTimer=setTimeout(()=>hideHandGuide(),duracion);
   }
 }
 
 function hideHandGuide(){
   clearTimeout(_handGuideTimer);
-  const block=document.getElementById('HAND_GUIDE_BLOCK');
-  if(block)block.style.display='none';
   const guide=document.getElementById('HAND_GUIDE');
   if(guide)guide.style.display='none';
 }
 function drawHand(){
   const PH=$('PH');PH.innerHTML='';
-  // Overlay de guía — bloquear cartas en fase 'play' (debe tomar primero)
+  // Mensaje guía debajo de la mano según fase (nunca bloquea)
   if(S.phase==='play'&&S.cur===0&&!S.over){
     const nom=MP.mode==='multi'?(MP.myName||'Jugador'):'Jugador';
     showHandGuide(
-      nom+': primero tomá una carta del mazo, tomá el descarte si querés, o golpeá si estás seguro de ganar',
-      'rgba(201,168,76,.9)',
-      true, // bloquea cartas
-      0     // no desaparece solo
+      nom+': primero tomá una carta del mazo, tomá el descarte si corresponde, o golpeá si estás seguro',
+      'rgba(201,168,76,.7)',
+      false,
+      0
     );
-  } else if(S.phase!=='play'){
+  } else if(S.phase!=='play'&&S.phase!=='drew'&&S.phase!=='took_discard'&&S.phase!=='showed_combo'){
     hideHandGuide();
   }
   const isReveal=S.phase==='golpeado_reveal'&&S._revPid===0;
