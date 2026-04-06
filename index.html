@@ -613,31 +613,40 @@ function hasBothWilds(hand){return hand.some(c=>c.jk)&&hand.some(c=>c.wl);}
 // Detecta si un jugador usó ambos comodines (en mano O en combos bajados)
 function usedBothWilds(i){
   try{
-    // Buscar todas las cartas del jugador i en cualquier lugar:
-    // mano, combos propios, combos ajenos (encajadas)
-    // Identificar por _owner si está disponible, sino por posición en mano
     const handCards=S.hands[i]||[];
+    // Combos propios del jugador
+    const shownOwn=(S.shown[i]||[]).flatMap(combo=>(combo&&combo.cards)||[]);
+    // Cartas encajadas en combos ajenos que pertenecen al jugador i
+    const todasEnMesa=S.shown.flatMap((shown,pi)=>{
+      if(pi===i)return []; // ya están en shownOwn
+      return (shown||[]).flatMap(combo=>(combo&&combo.cards)||[]);
+    });
+    const encajadasMias=todasEnMesa.filter(c=>c&&c._owner===i);
 
-    // Todas las cartas de todos los combos en mesa
-    const todasEnMesa=S.shown.flatMap(shown=>(shown||[]).flatMap(combo=>(combo&&combo.cards)||[]));
+    // Conjunto completo: mano + combos propios + encajadas en ajenos
+    const misCartas=[...handCards,...shownOwn,...encajadasMias];
 
-    // Una carta pertenece al jugador i si:
-    // a) Tiene _owner===i (marcado al repartir o al tomar del mazo)
-    // b) Está en su mano actualmente
-    const misCartas=[
-      ...handCards,
-      ...todasEnMesa.filter(c=>c&&c._owner===i)
-    ];
+    const tieneJoker=misCartas.some(c=>c&&c.jk);
+    const tieneWild=misCartas.some(c=>c&&c.wl);
 
-    // Si _owner no está disponible (partidas viejas), fallback: solo mano + combos propios
-    const tieneOwnerData=todasEnMesa.some(c=>c&&c._owner!==undefined);
-    if(!tieneOwnerData){
-      const shownCards=(S.shown[i]||[]).flatMap(combo=>(combo&&combo.cards)||[]);
-      const fallback=[...handCards,...shownCards];
-      return fallback.some(c=>c&&c.jk)&&fallback.some(c=>c&&c.wl);
+    // Si no encontramos por _owner, usar fallback amplio:
+    // verificar si los comodines están en cualquier combo de la mesa
+    // (para modo bots donde _owner puede no estar en todos lados)
+    if(!tieneJoker||!tieneWild){
+      // Buscar comodines en TODOS los combos y mano del jugador
+      const todasSuyas=[...handCards,...shownOwn];
+      const jkEnMano=todasSuyas.some(c=>c&&c.jk);
+      const wlEnMano=todasSuyas.some(c=>c&&c.wl);
+      if(jkEnMano&&wlEnMano)return true;
+
+      // En modo bots: si el jugador 0 tiene ambos comodines en cualquier lado
+      // verificar por descarte — los comodines del jugador 0 tienen _owner=0 siempre
+      const jkGlobal=encajadasMias.some(c=>c&&c.jk)||tieneJoker;
+      const wlGlobal=encajadasMias.some(c=>c&&c.wl)||tieneWild;
+      return jkGlobal&&wlGlobal;
     }
 
-    return misCartas.some(c=>c&&c.jk)&&misCartas.some(c=>c&&c.wl);
+    return tieneJoker&&tieneWild;
   }catch(e){return false;}
 }
 
@@ -1337,13 +1346,19 @@ function detectPenalties(){
   if(tie)return [];
   const penalties=[];
   for(let i=0;i<S.np;i++){
-    if(winners.includes(i))continue;
     const tieneComodines=usedBothWilds(i);
-    const golpoSinGanar=gp===i&&!gWon;
+    const golpoSinGanar=gp===i&&!gWon&&!tie;
+    // Penalizar comodines aunque sea ganador — es ventaja injusta
+    // Penalizar golpe sin ganar solo si no es empate
     if(golpoSinGanar||tieneComodines){
-      const reason=golpoSinGanar?'declaró GOLPEADO pero no ganó':
-        tieneComodines?'terminó con los 2 comodines':'';
-      penalties.push({name:PNAME(i),reason,color:PCOLOR[i]});
+      // Si ganó pero tiene comodines: pierde la ventaja (se suma +60 a su puntaje)
+      // Si perdió y tiene comodines: paga doble
+      const esGanador=winners.includes(i)&&!tie;
+      let reason='';
+      if(golpoSinGanar&&tieneComodines)reason='declaró GOLPEADO sin ganar y usó 2 comodines';
+      else if(golpoSinGanar)reason='declaró GOLPEADO pero no ganó';
+      else reason='usó los 2 comodines (★ Joker + ✦ Comodín grupal)';
+      penalties.push({name:PNAME(i),reason,color:PCOLOR[i],esGanador});
     }
   }
   return penalties;
@@ -2600,6 +2615,7 @@ function botEncajarEnMesa(pid){
       const ownFit=S.shown[pid].find(c=>canFit(c.cards,card,c));
       if(ownFit){
         card._fittedBy=pid;
+        if(card._owner===undefined)card._owner=pid;
         ownFit.cards.push(card);
         insertarEnExtremo(card,ownFit);
         S.hands[pid]=rmIds(S.hands[pid],[card.id]);
@@ -2610,6 +2626,7 @@ function botEncajarEnMesa(pid){
         const otherFit=S.shown.flat().filter(c=>!S.shown[pid].includes(c)).find(c=>canFit(c.cards,card,c));
         if(otherFit){
           card._fittedBy=pid;
+          if(card._owner===undefined)card._owner=pid;
           otherFit.cards.push(card);
           insertarEnExtremo(card,otherFit);
           S.hands[pid]=rmIds(S.hands[pid],[card.id]);
@@ -3008,6 +3025,7 @@ function doFitCard(card,combo){
   S.hands[0]=rmIds(S.hands[0],[card.id]);
   S._revSel.delete(card.id);
   card._fittedBy=0; // marcar quién encajó esta carta
+  if(card._owner===undefined)card._owner=0; // asegurar owner para detección de comodines
   sndCard(0.4);
   if(card.jk){
     // Joker: agregar al inicio por defecto para que el jugador elija moverlo al final si prefiere
