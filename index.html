@@ -1026,7 +1026,8 @@ async function historialGuardar(){
       golpeadorGano:gWon
     };
 
-    await sbFetch('/rest/v1/historial','POST',{
+    // Usar sbFetchMinimal para POST de historial (datos puede ser grande)
+    await sbFetchMinimal('/rest/v1/historial','POST',{
       sala_id:MP.salaId,
       datos:datos
     });
@@ -1712,18 +1713,14 @@ async function showCuentas(){
   rmEl('CUE_OV');
   const ov=document.createElement('div');ov.id='CUE_OV';
   ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.92);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:400;padding:20px';
-  // mostrar spinner mientras carga
   ov.innerHTML='<div style="color:var(--gold);font-family:Cinzel,serif;font-size:14px">💰 Cargando cuentas...</div>';
   $('G').appendChild(ov);
 
-  // en multi: cargar banco actualizado desde Supabase
   const cuentasSalaId=MP.salaId||MP._lastSalaId||'';
   if(MP.mode==='multi'&&cuentasSalaId){
-    try{
-      await loadBankFromSupabase(); // cargar acumulado desde Supabase
-    }catch(e){}
+    try{await loadBankFromSupabase();}catch(e){}
   } else if(MP.mode!=='multi'){
-    // modo local, no necesita cargar
+    // bots: banco local independiente
   }
 
   // obtener banco y nombres
@@ -4787,6 +4784,21 @@ async function procesarRachaSolo(ganoElJugador,esEmpate){
 }
 
 // ── API SUPABASE ──
+async function sbFetchMinimal(path,method='GET',body=null){
+  const opts={method,headers:{
+    'apikey':SB_KEY,
+    'Authorization':'Bearer '+SB_KEY,
+    'Content-Type':'application/json',
+    'Prefer':'return=minimal',
+    'X-Client-Info':'golpeado/1.0'
+  }};
+  if(body)opts.body=JSON.stringify(body);
+  try{
+    const r=await fetch(SB_URL+path,opts);
+    if(!r.ok){const t=await r.text();throw new Error('HTTP '+r.status+': '+t.slice(0,100));}
+    return true;
+  }catch(e){console.log('sbFetchMinimal error:',e);throw e;}
+}
 async function sbFetch(path,method='GET',body=null){
   const opts={method,headers:{
     'apikey':SB_KEY,
