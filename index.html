@@ -2457,12 +2457,14 @@ function actDiscard(){
   const cs=selCards();
   if(cs.length!==1){S.msg=miNom()+': Seleccioná 1 carta para descartar.';drawMsg();drawActs();return;}
   const card=cs[0];
-  // IMPORTANTE: quitar de mano ANTES de publicar
   S.hands[0]=rmIds(S.hands[0],[card.id]);
+  // Al descartar, limpiar _owner y _fittedBy para que no se cuente como del jugador
+  delete card._owner;
+  delete card._fittedBy;
   S.disc.push(card);
   sndDiscard();
   clrSel();S.comboThisTurn=false;
-  hideHandGuide(); // turno terminó — ocultar guía
+  hideHandGuide();
   passTurn();
   mpPublicarEstado();
 }
@@ -2608,7 +2610,8 @@ function botTurn(pid){
       const peor=h.reduce((a,b)=>cv(a)>=cv(b)?a:b);
       if(cv(peor)>cv(top)+2){
         S.disc.pop();S.hands[pid].push(top);
-        S.disc.push(peor);S.hands[pid]=rmIds(S.hands[pid],[peor.id]);
+        delete peor._owner;delete peor._fittedBy;
+  S.disc.push(peor);S.hands[pid]=rmIds(S.hands[pid],[peor.id]);
         S.msg=`${PNAME(pid)} intercambió cartas.`;
         passTurn();return;
       }
@@ -3829,7 +3832,7 @@ function drawActs(){
   }
 
   // ── FASE REVELACIÓN HUMANO ──
-  if(S.phase==='golpeado_reveal'&&S._revPid===0){
+  if(S.phase==='golpeado_reveal'&&S._revPid===0&&S._revOrd&&S._revOrd[S._revIdx]===0){
     const pts=S.hands[0].reduce((a,c)=>a+cv(c),0);
     let h='';
     const nextName=S._revIdx<S._revOrd.length-1?PNAME(S._revOrd[S._revIdx+1]):'';
@@ -3889,10 +3892,13 @@ function drawActs(){
       </div>`;
     }
     // Auto-listo: solo cuando el botón está activo (sin sobrantes o sin más opciones)
-    const listoActivo=(!_hh.length||!hayMas);
+    // Auto-listo SOLO cuando mano vacía (sin sobrantes) — 8 segundos para confirmar
+    // Con sobrantes el timer de revelación (3 min) maneja el tiempo límite
+    const listoActivo=(!_hh.length);
+    const autoListoSecs=8;
     if(listoActivo){
       // Mostrar countdown en el label
-      const autoSegs=S._autoListoSegs!==undefined?S._autoListoSegs:8;
+      const autoSegs=S._autoListoSegs!==undefined?S._autoListoSegs:autoListoSecs;
       if(autoSegs>0){
         listoLabel+=' ('+autoSegs+'s)';
       }
@@ -3903,7 +3909,7 @@ function drawActs(){
     // Arrancar/reiniciar timer de auto-listo solo si el botón está activo
     if(listoActivo){
       if(!_autoListoTimer){
-        S._autoListoSegs=8;
+        S._autoListoSegs=autoListoSecs;
         const tick=()=>{
           S._autoListoSegs=(S._autoListoSegs||1)-1;
           if(S._autoListoSegs<=0){
