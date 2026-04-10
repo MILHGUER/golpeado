@@ -2812,6 +2812,23 @@ function revealNext(){
     }
     redraw(); // muestra botón "Ver resultados" inmediatamente
     if(MP.mode==='multi')setTimeout(()=>mpPublicarEstado(),50);
+
+    // ── Calcular pagos y guardar historial automáticamente al terminar ──
+    // No esperar que nadie presione "Ver resultados"
+    if(!S._pagoProcessed){
+      const scores0=S.hands.map(h=>h.reduce((a,c)=>a+cv(c),0));
+      const adj0=scores0.map((s,i)=>s+(usedBothWilds(i)?60:0));
+      const min0=Math.min(...adj0);
+      const winners0=adj0.map((s,i)=>s===min0?i:-1).filter(i=>i>=0);
+      const tie0=winners0.length>1;
+      const gp0=S.golpBy;
+      const gWon0=gp0>=0&&adj0[gp0]===min0&&!tie0;
+      calcPayments(winners0,adj0,tie0,gp0,gWon0);
+    }
+    if(MP.mode==='multi'&&!S._historialGuardado){
+      S._historialGuardado=true;
+      historialGuardar().catch(()=>{});
+    }
     // Animación ganador/empate → luego penalizaciones si hay
     setTimeout(()=>{
       const penalties=detectPenalties();
@@ -3141,7 +3158,7 @@ function nuevaPartida(){
     voiceStop(true); // detener voz al volver al lobby (sin publicar estado)
     stopPoll();
     // ── LIMPIAR estado del juego anterior completamente ──
-    Object.assign(S,{deck:[],disc:[],hands:Array.from({length:S.np},()=>[]),shown:Array.from({length:S.np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{}});
+    Object.assign(S,{deck:[],disc:[],hands:Array.from({length:S.np},()=>[]),shown:Array.from({length:S.np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_rachaProcessed:false,_pagoProcessed:false,_historialGuardado:false});
     MP.mySlot=MP.isHost?0:MP.mySlot; // mantener slot
     // publicar estado de lobby para que todos vean la sala de espera
     const lobbyState={
@@ -3153,6 +3170,8 @@ function nuevaPartida(){
     };
     sbSet(MP.salaId,lobbyState).then(()=>{
       rmEl('OV');rmEl('SHUF');rmEl('PNLT_OV');rmEl('CONFIRM_LISTO');rmEl('CUE_OV');
+      BANK=null; // forzar recarga del banco desde Supabase
+      loadBankFromSupabase().catch(()=>{});
       suscribirSala(()=>buildLobbyUI(lobbyState,MP.isHost));
     }).catch(()=>{
       rmEl('MODE_OV');showModeScreen();
@@ -3164,11 +3183,9 @@ function nuevaPartida(){
 
 function verResultados(){
   if(MP.mode==='multi'){
-    // en multi publicar 'end' para todos, luego mostrar resultados
-    S.over=true;S.phase='end';
-    redraw();
-    mpPublicarEstado().catch(()=>{});
-    setTimeout(showFinalOv,300);
+    // En multi: cada jugador ve sus resultados de forma independiente
+    // NO publicar a todos — quien quiera quedarse en la mesa puede hacerlo
+    showFinalOv();
   } else {
     S.over=true;S.phase='end';
     redraw();
@@ -4163,25 +4180,6 @@ function showFinalOv(){
   }
 
   $('G').appendChild(ov);
-
-  // Guardar historial al terminar partida multi
-  if(MP.mode==='multi'&&!S._historialGuardado){
-    S._historialGuardado=true;
-    console.log('[HISTORIAL] Intentando guardar. isHost:',MP.isHost,'salaId:',MP.salaId);
-    historialGuardar().then(()=>{
-      console.log('[HISTORIAL] Guardado OK');
-    }).catch(e=>{
-      console.log('[HISTORIAL] Error:',e);
-      // Mostrar error visible
-      const dbg=document.createElement('div');
-      dbg.style.cssText='position:fixed;bottom:10px;left:10px;right:10px;background:rgba(200,0,0,.9);color:#fff;font-size:10px;padding:6px;border-radius:4px;z-index:9999;font-family:monospace;word-break:break-all';
-      dbg.textContent='Historial error: '+e.message;
-      document.body.appendChild(dbg);
-      setTimeout(()=>dbg.remove(),10000);
-    });
-  } else if(MP.mode==='multi'){
-    console.log('[HISTORIAL] Ya guardado o no multi. _historialGuardado:',S._historialGuardado);
-  }
 
   // Procesar racha solo UNA VEZ por partida
   if(MP.mode==='solo'&&!S._rachaProcessed){
