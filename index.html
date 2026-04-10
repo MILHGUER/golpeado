@@ -5213,7 +5213,7 @@ function buildLobbyUI(estado,isHost){
     ${isHost?`
     <div style="display:flex;flex-direction:column;gap:6px;width:100%;max-width:300px">
       <div style="font-size:9px;color:rgba(232,220,200,.5);font-family:Cinzel,serif">APUESTA POR JUGADOR</div>
-      <div id="LB_CHIPS" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"></div>
+      <div id="LB_CHIPS" style="position:relative;width:100%;height:100px;display:flex;align-items:flex-end;justify-content:center"></div>
       <div id="LB_APUESTA_LBL" style="font-size:10px;color:rgba(232,220,200,.4);text-align:center">Sin apuesta</div>
     </div>
     <button id="LB_INICIAR" disabled style="width:100%;max-width:300px;padding:12px;border-radius:8px;border:none;background:rgba(201,168,76,.3);color:rgba(201,168,76,.5);font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:not-allowed;touch-action:manipulation">Iniciar partida (mín. 2 jugadores)</button>
@@ -5315,26 +5315,41 @@ function buildLobbyUI(estado,isHost){
     const chipsRow=ov.querySelector('#LB_CHIPS');
     let apuestaSeleccionada=estado.apuesta||0;
     const allBtns=[];
-    [{v:0,label:'Sin apuesta'},...CHIPS].forEach(chip=>{
-      const btn=document.createElement('div');
-      btn.style.cssText='cursor:pointer;touch-action:manipulation;transition:transform .12s,opacity .12s;display:flex;align-items:center;justify-content:center';
-      if(chip.v===0){
-        btn.innerHTML=`<span style="padding:5px 10px;border-radius:5px;border:1.5px solid rgba(232,220,200,.4);color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:9px;white-space:nowrap">Sin apuesta</span>`;
-      } else {
-        btn.appendChild(mkChip(chip.v,32,true));
-      }
-      allBtns.push({btn,v:chip.v});
-      const updateSel=()=>{
-        // resaltar seleccionado, atenuar los demás
-        allBtns.forEach(({btn:b,v})=>{
-          const isSel=v===chip.v;
-          b.style.transform=isSel?'scale(1.2)':'scale(1)';
-          b.style.opacity=isSel?'1':'0.45';
-          // borde dorado en el seleccionado
-          const inner=b.firstChild;
-          if(inner)inner.style.boxShadow=isSel?'0 0 0 3px #fff, 0 0 12px rgba(201,168,76,.6)':'none';
-        });
-      };
+    // Abanico de fichas — mismo efecto que showBetScreen
+    const lobbyChips=[{v:0,label:'0'},...CHIPS];
+    const nLC=lobbyChips.length;
+    const lcAngleStart=-32;
+    const lcAngleEnd=32;
+    const lcRadius=80;
+
+    lobbyChips.forEach((chip,idx)=>{
+      const angle=lcAngleStart+(lcAngleEnd-lcAngleStart)*(idx/(nLC-1));
+      const rad=angle*Math.PI/180;
+      const tx=Math.sin(rad)*lcRadius;
+      const ty=-Math.cos(rad)*lcRadius+lcRadius;
+
+      const chipEl=chip.v===0
+        ? (()=>{
+            const d=document.createElement('div');
+            d.style.cssText=`position:absolute;bottom:0;left:50%;transform-origin:bottom center;transform:translateX(-50%) translateX(${tx}px) translateY(${-ty}px) rotate(${angle}deg);transition:transform .2s ease,opacity .2s;cursor:pointer;touch-action:manipulation;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;border:2px dashed rgba(232,220,200,.4);background:rgba(0,0,0,.3)`;
+            d.innerHTML=`<span style="font-family:Cinzel,serif;font-size:7px;color:rgba(232,220,200,.6);text-align:center;line-height:1.1">SIN<br>BET</span>`;
+            return d;
+          })()
+        : (()=>{
+            const el=mkChip(chip.v,36,false);
+            el.style.position='absolute';
+            el.style.bottom='0';
+            el.style.left='50%';
+            el.style.transformOrigin='bottom center';
+            el.style.transform=`translateX(-50%) translateX(${tx}px) translateY(${-ty}px) rotate(${angle}deg)`;
+            el.style.transition='transform .2s ease, opacity .2s';
+            el.style.cursor='pointer';
+            el.style.touchAction='manipulation';
+            return el;
+          })();
+
+      allBtns.push({btn:chipEl,v:chip.v,angle,tx,ty});
+
       const sel=()=>{
         apuestaSeleccionada=chip.v;
         const lbl=document.getElementById('LB_APUESTA_LBL');
@@ -5342,18 +5357,26 @@ function buildLobbyUI(estado,isHost){
           lbl.textContent=chip.v===0?'Sin apuesta':`Apuesta: ${chip.v} ficha${chip.v>1?'s':''} por jugador`;
           lbl.style.color=chip.v===0?'rgba(232,220,200,.4)':'var(--gold)';
         }
-        // actualizar visual de todos
-        allBtns.forEach(({btn:b,v})=>{
-          b.style.transform=v===chip.v?'scale(1.2)':'scale(1)';
-          b.style.opacity=v===chip.v?'1':'0.4';
-          const inner=b.firstChild;
-          if(inner)inner.style.boxShadow=v===chip.v?'0 0 0 3px #fff, 0 0 12px rgba(201,168,76,.6)':'none';
+        // abanico: resaltar seleccionada
+        allBtns.forEach(({btn:b,v,angle:a,tx:x,ty:y})=>{
+          if(v===chip.v){
+            b.style.transform=`translateX(-50%) translateX(${x}px) translateY(${-y-16}px) rotate(${a*0.4}deg) scale(1.12)`;
+            b.style.opacity='1';
+            const main=b.lastChild;
+            if(main&&main.style)main.style.boxShadow='0 0 0 3px #fff, 0 0 14px rgba(255,255,255,.5)';
+          } else {
+            b.style.transform=`translateX(-50%) translateX(${x}px) translateY(${-y}px) rotate(${a}deg) scale(0.9)`;
+            b.style.opacity='0.4';
+            const main=b.lastChild;
+            if(main&&main.style)main.style.boxShadow='none';
+          }
         });
         actualizarApuestaRemota(chip.v);
         sndSelect();
       };
-      btn.addEventListener('click',sel);btn.addEventListener('touchend',e=>{e.preventDefault();sel();},{passive:false});
-      chipsRow.appendChild(btn);
+      chipEl.addEventListener('click',sel);
+      chipEl.addEventListener('touchend',e=>{e.preventDefault();sel();},{passive:false});
+      chipsRow.appendChild(chipEl);
     });
 
     // botón iniciar — lee estado actualizado de supabase
