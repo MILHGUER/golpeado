@@ -303,14 +303,20 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 .penalty-icon{font-size:clamp(40px,10vw,64px);animation:penaltyIn .5s cubic-bezier(.175,.885,.32,1.275) forwards;line-height:1}
 .penalty-title{font-family:'Cinzel',serif;font-size:clamp(22px,6vw,44px);font-weight:700;color:#E24B4A;letter-spacing:.06em;text-shadow:0 0 30px rgba(226,75,74,.8),0 3px 0 rgba(0,0,0,.5);animation:penaltyIn .45s .1s cubic-bezier(.175,.885,.32,1.275) both;line-height:1.1;text-align:center}
 .penalty-sub{font-family:'Cinzel',serif;font-size:clamp(11px,3vw,16px);color:rgba(232,220,200,.9);letter-spacing:.08em;text-align:center;max-width:280px;line-height:1.5;opacity:0;animation:penaltyIn .4s .3s ease-out forwards;padding:0 16px}
-.chip{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-family:'Cinzel',serif;font-weight:700;cursor:pointer;border:3px dashed rgba(255,255,255,.35);transition:transform .12s,box-shadow .12s;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;flex-shrink:0}
+.chip{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-family:'Cinzel',serif;font-weight:700;cursor:pointer;border:3px dashed rgba(255,255,255,.35);transition:transform .15s,box-shadow .15s;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;flex-shrink:0;position:relative}
 .chip:active{transform:scale(.92)}
-.chip.sel{transform:scale(1.18);box-shadow:0 0 0 3px #fff,0 0 16px rgba(255,255,255,.5)}
+.chip.sel{transform:scale(1.18) translateY(-4px);box-shadow:0 0 0 3px #fff,0 0 20px rgba(255,255,255,.5)}
 .chip-1 {width:52px;height:52px;background:#e8e8e8;color:#333;font-size:14px;border-color:rgba(0,0,0,.2)}
+.chip-2 {width:52px;height:52px;background:#9B59B6;color:#fff;font-size:14px}
 .chip-5 {width:52px;height:52px;background:#C0392B;color:#fff;font-size:14px}
 .chip-10{width:52px;height:52px;background:#2471A3;color:#fff;font-size:14px}
 .chip-20{width:52px;height:52px;background:#1E8449;color:#fff;font-size:14px}
 .chip-50{width:52px;height:52px;background:#1a1a1a;color:#C9A84C;font-size:13px;border-color:#C9A84C}
+/* Efecto apilado — sombras que simulan fichas debajo */
+.chip-stack{position:relative;display:inline-block}
+.chip-stack::before,.chip-stack::after{content:'';position:absolute;border-radius:50%;left:50%;transform:translateX(-50%)}
+.chip-stack::before{width:90%;height:90%;top:5px;background:inherit;opacity:0.5;z-index:-1;filter:brightness(.7)}
+.chip-stack::after{width:82%;height:82%;top:9px;background:inherit;opacity:0.3;z-index:-2;filter:brightness(.5)}
 #CUENTAS_BTN{position:absolute;top:6px;right:8px;z-index:50;font-family:'Cinzel',serif;font-size:8px;color:rgba(201,168,76,.5);border:1px solid rgba(201,168,76,.25);background:transparent;border-radius:4px;padding:2px 6px;cursor:pointer;touch-action:manipulation}
 #CUENTAS_BTN:hover,#CUENTAS_BTN:active{color:var(--gold);border-color:var(--gold)}
 </style>
@@ -1367,7 +1373,7 @@ function detectPenalties(){
 
 // BANCO DE FICHAS — persiste entre partidas
 // ══════════════════════════════════════
-const CHIPS=[{v:1,label:'1',cls:'chip-1'},{v:5,label:'5',cls:'chip-5'},{v:10,label:'10',cls:'chip-10'},{v:20,label:'20',cls:'chip-20'},{v:50,label:'50',cls:'chip-50'}];
+const CHIPS=[{v:1,label:'1',cls:'chip-1'},{v:2,label:'2',cls:'chip-2'},{v:5,label:'5',cls:'chip-5'},{v:10,label:'10',cls:'chip-10'},{v:20,label:'20',cls:'chip-20'},{v:50,label:'50',cls:'chip-50'}];
 
 // banco[i][j] = cuánto debe el jugador i al jugador j (puede ser negativo = le deben)
 function loadBank(){
@@ -1562,7 +1568,7 @@ function showBetScreen(){
         </div>
       </div>`:''}
       <div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center">Elegí el valor de la ficha para esta partida.</div>
-      <div id="CHIP_ROW" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"></div>
+      <div id="CHIP_ROW" style="position:relative;width:100%;height:110px;display:flex;align-items:flex-end;justify-content:center"></div>
       <div id="BET_INFO" style="font-family:Cinzel,serif;font-size:13px;color:rgba(232,220,200,.4)">Seleccioná una ficha</div>
       <div style="display:flex;gap:10px;width:100%">
         <button id="BET_BACK" style="flex:0 0 auto;padding:10px 8px;border-radius:6px;border:1.5px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.45);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">← Volver</button>
@@ -1586,22 +1592,55 @@ function showBetScreen(){
 
   // crear fichas
   const row=ov.querySelector('#CHIP_ROW');
-  CHIPS.forEach(chip=>{
-    const c=document.createElement('div');
-    c.className=`chip ${chip.cls}`;
-    c.textContent=chip.label;
+  // Abanico de fichas — semicírculo
+  const betChipBtns=[];
+  const n=CHIPS.length; // 6 fichas
+  const angleStart=-30; // grados inicio del abanico
+  const angleEnd=30;    // grados fin
+  const radius=90;      // radio del semicírculo en px
+
+  CHIPS.forEach((chip,idx)=>{
+    const angle=angleStart+(angleEnd-angleStart)*(idx/(n-1));
+    const rad=angle*Math.PI/180;
+    const tx=Math.sin(rad)*radius;
+    const ty=-Math.cos(rad)*radius+radius; // arriba del punto base
+
+    const chipEl=mkChip(chip.v,44,false);
+    chipEl.style.position='absolute';
+    chipEl.style.bottom='0';
+    chipEl.style.left='50%';
+    chipEl.style.transformOrigin='bottom center';
+    chipEl.style.transform=`translateX(-50%) translateX(${tx}px) translateY(${-ty}px) rotate(${angle}deg)`;
+    chipEl.style.transition='transform .2s ease, opacity .2s';
+    chipEl.style.cursor='pointer';
+    chipEl.style.touchAction='manipulation';
+
+    betChipBtns.push({chipEl,v:chip.v,angle,tx,ty});
+
     const sel=()=>{
       BET=chip.v;
-      row.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel'));
-      c.classList.add('sel');
+      betChipBtns.forEach(({chipEl:ce,v,angle:a,tx:x,ty:y})=>{
+        if(v===chip.v){
+          // seleccionada: sube y se endereza un poco
+          ce.style.transform=`translateX(-50%) translateX(${x}px) translateY(${-y-18}px) rotate(${a*0.4}deg) scale(1.12)`;
+          ce.style.opacity='1';
+          const main=ce.lastChild;
+          if(main)main.style.boxShadow='0 0 0 3px #fff, 0 0 16px rgba(255,255,255,.5)';
+        } else {
+          ce.style.transform=`translateX(-50%) translateX(${x}px) translateY(${-y}px) rotate(${a}deg) scale(0.9)`;
+          ce.style.opacity='0.45';
+          const main=ce.lastChild;
+          if(main)main.style.boxShadow='none';
+        }
+      });
       ov.querySelector('#BET_INFO').textContent=`Apuesta: ${chip.v} ficha${chip.v>1?'s':''} por jugador`;
       ov.querySelector('#BET_INFO').style.color='var(--gold)';
       const ok=ov.querySelector('#BET_OK');
       ok.disabled=false;ok.style.opacity='1';
     };
-    c.addEventListener('click',sel);
-    c.addEventListener('touchend',e=>{e.preventDefault();sel();},{passive:false});
-    row.appendChild(c);
+    chipEl.addEventListener('click',sel);
+    chipEl.addEventListener('touchend',e=>{e.preventDefault();sel();},{passive:false});
+    row.appendChild(chipEl);
   });
 
   const skip=ov.querySelector('#BET_SKIP');
@@ -3276,14 +3315,40 @@ function mkFace(c,selectable){
 }
 
 // Mini ficha visual — tamaño configurable
-function mkChip(val,size=28){
-  const cfg=CHIPS.find(c=>c.v===val)||{v:val,cls:'chip-1'};
-  const colors={1:['#e8e8e8','#333'],5:['#C0392B','#fff'],10:['#2471A3','#fff'],20:['#1E8449','#fff'],50:['#1a1a1a','#C9A84C']};
-  const [bg,fg]=colors[val]||['#888','#fff'];
+function mkChip(val,size=28,stacked=false){
+  const colors={
+    1:['#e8e8e8','#333','rgba(0,0,0,.2)'],
+    2:['#9B59B6','#fff','rgba(255,255,255,.35)'],
+    5:['#C0392B','#fff','rgba(255,255,255,.35)'],
+    10:['#2471A3','#fff','rgba(255,255,255,.35)'],
+    20:['#1E8449','#fff','rgba(255,255,255,.35)'],
+    50:['#1a1a1a','#C9A84C','#C9A84C']
+  };
+  const [bg,fg,bc]=colors[val]||['#888','#fff','rgba(255,255,255,.35)'];
+  const bord=Math.round(size*0.08);
+  const fs=Math.round(size*0.36);
+
+  // Contenedor con efecto apilado
+  const wrap=document.createElement('div');
+  wrap.style.cssText=`position:relative;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:${size+6}px;height:${size+10}px`;
+
+  // Capas de sombra (fichas debajo) — solo en modo stacked
+  if(stacked){
+    [10,6,3].forEach((offset,i)=>{
+      const shadow=document.createElement('div');
+      const opacity=[0.25,0.4,0.6][i];
+      const bright=['60%','75%','90%'][i];
+      shadow.style.cssText=`position:absolute;width:${size}px;height:${size}px;border-radius:50%;background:${bg};filter:brightness(${bright});opacity:${opacity};top:${offset}px;left:3px;border:${bord}px dashed ${bc}`;
+      wrap.appendChild(shadow);
+    });
+  }
+
+  // Ficha principal
   const e=document.createElement('div');
-  e.style.cssText=`width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:${fg};font-family:Cinzel,serif;font-weight:700;font-size:${Math.round(size*0.38)}px;display:inline-flex;align-items:center;justify-content:center;border:${Math.round(size*0.09)}px dashed ${val===50?'#C9A84C':'rgba(255,255,255,.35)'};flex-shrink:0`;
+  e.style.cssText=`position:relative;width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:${fg};font-family:Cinzel,serif;font-weight:700;font-size:${fs}px;display:inline-flex;align-items:center;justify-content:center;border:${bord}px dashed ${bc};flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.2);margin-left:${stacked?3:0}px`;
   e.textContent=val;
-  return e;
+  wrap.appendChild(e);
+  return wrap;
 }
 
 function drawBots(){
@@ -5252,7 +5317,7 @@ function buildLobbyUI(estado,isHost){
       if(chip.v===0){
         btn.innerHTML=`<span style="padding:5px 10px;border-radius:5px;border:1.5px solid rgba(232,220,200,.4);color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:9px;white-space:nowrap">Sin apuesta</span>`;
       } else {
-        btn.appendChild(mkChip(chip.v,32));
+        btn.appendChild(mkChip(chip.v,32,true));
       }
       allBtns.push({btn,v:chip.v});
       const updateSel=()=>{
