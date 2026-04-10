@@ -1719,7 +1719,9 @@ async function showCuentas(){
   // en multi: cargar banco actualizado desde Supabase
   const cuentasSalaId=MP.salaId||MP._lastSalaId||'';
   if(MP.mode==='multi'&&cuentasSalaId){
-    try{await loadBankFromSupabase();}catch(e){} // ignorar error si no hay datos
+    try{
+      await loadBankFromSupabase(); // cargar acumulado desde Supabase
+    }catch(e){}
   } else if(MP.mode!=='multi'){
     // modo local, no necesita cargar
   }
@@ -1911,8 +1913,11 @@ function calcPayments(winners,adj,tie,gp,gWon){
   // obtener/inicializar banco
   let bankMatrix;
   if(MP.mode==='multi'){
-    // siempre leer fresh del localStorage para tener el acumulado correcto
-    BANK=loadBank();
+    // Recargar desde localStorage (que tiene el último valor sincronizado con Supabase)
+    const savedBank=loadBank();
+    if(savedBank&&savedBank.matrix){
+      BANK=savedBank;
+    }
     if(!BANK||!BANK.matrix){
       BANK={matrix:Array.from({length:S.np},()=>Array(S.np).fill(0)),names:[]};
     }
@@ -5574,8 +5579,31 @@ function aplicarEstadoRemoto(estado){
   };
   const rawHands=estado.hands||Array.from({length:S.np},()=>[]);
   const rawShown=estado.shown||Array.from({length:S.np},()=>[]);
-  S.hands=rot(rawHands,MP.mySlot,S.np);
-  S.shown=rot(rawShown,MP.mySlot,S.np);
+  const newHands=rot(rawHands,MP.mySlot,S.np);
+  const newShown=rot(rawShown,MP.mySlot,S.np);
+
+  // Preservar orden local de la mano del jugador (S.hands[0])
+  // Solo actualizar si hay cambios reales (carta nueva o carta removida)
+  const localHand=S.hands&&S.hands[0]?S.hands[0]:[];
+  const remoteHand=newHands[0]||[];
+  const localIds=new Set(localHand.map(c=>c.id));
+  const remoteIds=new Set(remoteHand.map(c=>c.id));
+  const mismoConjunto=localHand.length===remoteHand.length&&
+    remoteHand.every(c=>localIds.has(c.id));
+
+  S.shown=newShown;
+  if(mismoConjunto&&localHand.length>0){
+    // Mismo conjunto de cartas — preservar orden local del jugador
+    S.hands=newHands;
+    S.hands[0]=localHand; // restaurar orden que el jugador eligió
+  } else {
+    // Cartas cambiaron (tomó o descartó) — usar orden del servidor
+    // pero preservar las que ya tenía en el mismo orden + agregar nuevas al final
+    const cartasNuevas=remoteHand.filter(c=>!localIds.has(c.id));
+    const cartasKept=localHand.filter(c=>remoteIds.has(c.id));
+    S.hands=newHands;
+    S.hands[0]=[...cartasKept,...cartasNuevas];
+  }
 
   // rotar cur y golpBy
   S.cur=(((estado.cur||0)-MP.mySlot)+S.np)%S.np;
