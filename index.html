@@ -620,11 +620,9 @@ function hasBothWilds(hand){return hand.some(c=>c.jk)&&hand.some(c=>c.wl);}
 // Detecta si un jugador usó ambos comodines (en mano O en combos bajados)
 function usedBothWilds(i){
   try{
-    // Cartas del jugador i: mano + sus propios combos bajados
     const handCards=S.hands[i]||[];
     const shownOwn=(S.shown[i]||[]).flatMap(combo=>(combo&&combo.cards)||[]);
 
-    // Cartas encajadas en combos AJENOS que tienen _owner===i
     const encajadasMias=S.shown.flatMap((shown,pi)=>{
       if(pi===i)return [];
       return (shown||[]).flatMap(combo=>(combo&&combo.cards)||[]);
@@ -632,9 +630,17 @@ function usedBothWilds(i){
 
     const misCartas=[...handCards,...shownOwn,...encajadasMias];
 
-    // Solo penalizar si AMBOS comodines son del mismo jugador i
     const tieneJoker=misCartas.some(c=>c&&c.jk);
     const tieneWild=misCartas.some(c=>c&&c.wl);
+
+    // DEBUG temporal
+    if(tieneJoker&&tieneWild){
+      console.log('[WILDS] jugador',i,'PENALIZADO. Jokers:',
+        misCartas.filter(c=>c&&c.jk).map(c=>({owner:c._owner,fitted:c._fittedBy})),
+        'Wilds:',misCartas.filter(c=>c&&c.wl).map(c=>({owner:c._owner,fitted:c._fittedBy}))
+      );
+    }
+
     return tieneJoker&&tieneWild;
   }catch(e){return false;}
 }
