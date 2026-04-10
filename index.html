@@ -1031,7 +1031,20 @@ async function historialGuardar(){
         }
       }
     }catch(e){}
-  }catch(e){console.log('historial error:',e);}
+  }catch(e){
+    console.log('historial error:',e);
+    // Mostrar error brevemente para debugging
+    try{
+      const G=document.getElementById('G');
+      if(G){
+        const dbg=document.createElement('div');
+        dbg.style.cssText='position:fixed;bottom:10px;left:10px;right:10px;background:rgba(200,0,0,.9);color:#fff;font-size:10px;padding:6px;border-radius:4px;z-index:9999;font-family:monospace;word-break:break-all';
+        dbg.textContent='Historial error: '+e.message;
+        document.body.appendChild(dbg);
+        setTimeout(()=>dbg.remove(),8000);
+      }
+    }catch(e2){}
+  }
 }
 
 async function historialCargar(salaId,offset=0){
