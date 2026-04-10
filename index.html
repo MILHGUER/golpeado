@@ -620,27 +620,27 @@ function hasBothWilds(hand){return hand.some(c=>c.jk)&&hand.some(c=>c.wl);}
 // Detecta si un jugador usó ambos comodines (en mano O en combos bajados)
 function usedBothWilds(i){
   try{
+    // Mano + propios combos bajados
     const handCards=S.hands[i]||[];
     const shownOwn=(S.shown[i]||[]).flatMap(combo=>(combo&&combo.cards)||[]);
 
+    // Cartas encajadas en combos AJENOS usando _fittedBy (más confiable que _owner en multi)
     const encajadasMias=S.shown.flatMap((shown,pi)=>{
       if(pi===i)return [];
       return (shown||[]).flatMap(combo=>(combo&&combo.cards)||[]);
-    }).filter(c=>c&&(c._owner===i||c._fittedBy===i));
+    }).filter(c=>c&&c._fittedBy===i);
 
     const misCartas=[...handCards,...shownOwn,...encajadasMias];
 
     const tieneJoker=misCartas.some(c=>c&&c.jk);
     const tieneWild=misCartas.some(c=>c&&c.wl);
-
-    // DEBUG temporal
     if(tieneJoker&&tieneWild){
-      console.log('[WILDS] jugador',i,'PENALIZADO. Jokers:',
-        misCartas.filter(c=>c&&c.jk).map(c=>({owner:c._owner,fitted:c._fittedBy})),
-        'Wilds:',misCartas.filter(c=>c&&c.wl).map(c=>({owner:c._owner,fitted:c._fittedBy}))
-      );
+      const wl=misCartas.find(c=>c&&c.wl);
+      console.log('[WILDS] jugador',i,'penalizado. Wild en shown['+i+']:',
+        shownOwn.some(c=>c&&c.wl),
+        'fittedBy:',wl?wl._fittedBy:'?',
+        'mano:',handCards.some(c=>c&&c.wl));
     }
-
     return tieneJoker&&tieneWild;
   }catch(e){return false;}
 }
@@ -5851,7 +5851,18 @@ async function mpPublicarEstado(){
     };
     const np=S.np;
     const realHands=MP.mySlot>0?deRot(S.hands,MP.mySlot,np):S.hands.slice(0,np);
-    const realShown=MP.mySlot>0?deRot(S.shown,MP.mySlot,np):S.shown.slice(0,np);
+    // Des-rotar shown Y _fittedBy dentro de cada carta
+    const rawShown=MP.mySlot>0?deRot(S.shown,MP.mySlot,np):S.shown.slice(0,np);
+    const deRotFittedBy=cards=>(cards||[]).map(c=>{
+      if(!c||c._fittedBy===undefined||c._fittedBy===null)return c;
+      return Object.assign({},c,{_fittedBy:(c._fittedBy+MP.mySlot)%np});
+    });
+    const realShown=rawShown.map(playerShown=>(playerShown||[]).map(combo=>
+      Object.assign({},combo,{
+        cards:deRotFittedBy(combo.cards),
+        order:combo.order?deRotFittedBy(combo.order):null
+      })
+    ));
     // des-rotar cur y golpBy
     const realCur=(S.cur+MP.mySlot)%np;
     const realGolpBy=S.golpBy>=0?(S.golpBy+MP.mySlot)%np:-1;
