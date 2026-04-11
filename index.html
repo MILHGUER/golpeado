@@ -2827,10 +2827,10 @@ function revealNext(){
     }
     if(MP.mode==='multi'&&!S._historialGuardado){
       S._historialGuardado=true;
-      console.log('[HIST] Guardando historial. isHost:',MP.isHost,'sala:',MP.salaId);
-      historialGuardar().then(()=>console.log('[HIST] OK')).catch(e=>console.log('[HIST] ERROR:',e));
+      console.log('[HIST] Guardando. isHost:',MP.isHost,'sala:',MP.salaId,'revIdx:',S._revIdx,'revOrd:',S._revOrd);
+      historialGuardar().then(()=>console.log('[HIST] OK sala:',MP.salaId)).catch(e=>console.log('[HIST] ERROR:',e));
     } else {
-      console.log('[HIST] Saltado. mode:',MP.mode,'guardado:',S._historialGuardado);
+      console.log('[HIST] Saltado. guardado:',S._historialGuardado,'sala:',MP.salaId);
     }
     // Animación ganador/empate → luego penalizaciones si hay
     setTimeout(()=>{
