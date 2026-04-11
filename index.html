@@ -2827,7 +2827,10 @@ function revealNext(){
     }
     if(MP.mode==='multi'&&!S._historialGuardado){
       S._historialGuardado=true;
-      historialGuardar().catch(()=>{});
+      console.log('[HIST] Guardando historial. isHost:',MP.isHost,'sala:',MP.salaId);
+      historialGuardar().then(()=>console.log('[HIST] OK')).catch(e=>console.log('[HIST] ERROR:',e));
+    } else {
+      console.log('[HIST] Saltado. mode:',MP.mode,'guardado:',S._historialGuardado);
     }
     // Animación ganador/empate → luego penalizaciones si hay
     setTimeout(()=>{
