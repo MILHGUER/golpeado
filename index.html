@@ -3559,7 +3559,9 @@ function drawCenter(){
         // Solo si está en un extremo (primer o último lugar en el orden)
         const jokerEnExtremo=c.jk&&(cardIdx===0||cardIdx===ordered.length-1);
         // Draggable si: combo propio O si el Joker fue encajado por el jugador 0 en este combo
-        const jokerDraggable=c.jk&&!S.over&&jokerEnExtremo&&(pi===0||combo._jokerOwner===0);
+        // También permitir durante fase de revelación (golpeado_reveal)
+        const enFaseValida=!S.over||(S.phase==='golpeado_reveal'||S.phase==='mesa_final');
+        const jokerDraggable=c.jk&&enFaseValida&&jokerEnExtremo&&(pi===0||combo._jokerOwner===0);
         if(jokerDraggable){
           ce.style.cursor='grab';ce.draggable=true;
           ce.title='Arrastrá el Joker al otro extremo para cambiar su valor';
@@ -3596,12 +3598,12 @@ function drawCenter(){
           },{passive:true});
         }
         // Si el Joker está en el medio, no es draggable pero mostrar tooltip
-        if(c.jk&&!S.over&&!jokerEnExtremo){
+        if(c.jk&&enFaseValida&&!jokerEnExtremo){
           ce.title='El Joker está en el medio — no se puede mover';
           ce.style.cursor='not-allowed';
         }
         // drop zone para Joker drag (combos propios O con _jokerOwner)
-        if((pi===0||combo._jokerOwner===0)&&!S.over){
+        if((pi===0||combo._jokerOwner===0)&&enFaseValida){
           ce.dataset.jdrop=cardIdx;
           ce.addEventListener('dragover',ev=>{ev.preventDefault();ce.style.outline='2px solid '+color;});
           ce.addEventListener('dragleave',()=>ce.style.outline='');
