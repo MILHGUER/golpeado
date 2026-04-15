@@ -3920,11 +3920,11 @@ function drawHand(){
         const gr=G.getBoundingClientRect();
         const cardW=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cw'))||50;
         const cardH=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ch'))||74;
-        const scale=1.8;
+        const scale=window.innerWidth<600?2.6:1.8;
         const w=cardW*scale;
         dtDiv.style.position='absolute';
         dtDiv.style.left=(dr.left-gr.left+(dr.width/2)-(w/2))+'px';
-        dtDiv.style.top=(dr.top-gr.top-(cardH*2.2))+'px';
+        dtDiv.style.top=(dr.top-gr.top-(cardH*(scale+0.4)))+'px';
         dtDiv.style.width=w+'px';
         dtDiv.style.zIndex='80';
         dtDiv.style.overflow='visible';
@@ -3949,7 +3949,8 @@ function drawHand(){
       // Mensaje dentro de la carta
       const msg=document.createElement('div');
       msg.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72);border-radius:6px;padding:4px;z-index:2;pointer-events:none';
-      msg.innerHTML='<span style="font-family:Cinzel,serif;font-size:8px;color:#fff;text-align:center;line-height:1.6;letter-spacing:.03em;text-shadow:0 1px 3px rgba(0,0,0,.9)">Seleccioná<br>2+ cartas<br>de tu mano<br>para combo</span>';
+      const msgFz=window.innerWidth<600?'10px':'8px';
+      msg.innerHTML=`<span style="font-family:Cinzel,serif;font-size:${msgFz};color:#fff;text-align:center;line-height:1.6;letter-spacing:.03em;text-shadow:0 1px 3px rgba(0,0,0,.9)">Seleccioná<br>2+ cartas<br>de tu mano<br>para combo</span>`;
       ce.appendChild(msg);
       wrapper.appendChild(ce);
       // X roja — fuera del clip, en esquina superior derecha del wrapper
