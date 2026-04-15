@@ -405,13 +405,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 <div id="G">
   <div class="border"></div>
   <button id="CUENTAS_BTN" onclick="showCuentas()" ontouchend="e=>{e.preventDefault();showCuentas()}">💰 Cuentas</button>
-  <button id="HIST_BTN" onclick="showHistorialOv(typeof MP!=='undefined'?MP.salaId||'':'')" ontouchend="event.preventDefault();showHistorialOv(typeof MP!=='undefined'?MP.salaId||'':'')" style="position:absolute;top:6px;right:72px;z-index:50;font-family:'Cinzel',serif;font-size:8px;color:rgba(232,220,200,.4);border:1px solid rgba(232,220,200,.15);background:transparent;border-radius:4px;padding:2px 6px;cursor:pointer;touch-action:manipulation">📜 Historial</button>
+  <button id="HIST_BTN" onclick="showHistorialOv(typeof MP!=='undefined'?MP.salaId||'':'')" ontouchend="event.preventDefault();showHistorialOv(typeof MP!=='undefined'?MP.salaId||'':'')" style="position:absolute;top:6px;right:104px;z-index:50;font-family:'Cinzel',serif;font-size:8px;color:rgba(232,220,200,.4);border:1px solid rgba(232,220,200,.15);background:transparent;border-radius:4px;padding:2px 6px;cursor:pointer;touch-action:manipulation">📜 Historial</button>
+  <button id="LANG_BTN" onclick="setLang(_lang==='es'?'en':'es')" ontouchend="event.preventDefault();setLang(_lang==='es'?'en':'es')" style="position:absolute;top:6px;right:58px;z-index:50;font-family:'Cinzel',serif;font-size:11px;color:#1a1230;background:var(--gold);border:none;border-radius:20px;padding:4px 10px;cursor:pointer;touch-action:manipulation;font-weight:700;letter-spacing:.06em;box-shadow:0 2px 8px rgba(0,0,0,.4)">EN</button>
   <div id="BR"></div>
   <div class="czone" style="flex:1;min-height:0">
     <div id="TC"></div>
     <div class="dkarea">
-      <div><div class="dkstack" id="DK"></div><div class="dklbl">MAZO</div></div>
-      <div><div id="DP"></div><div class="dklbl">DESCARTE</div></div>
+      <div><div class="dkstack" id="DK"></div><div class="dklbl" id="LBL_MAZO">MAZO</div></div>
+      <div><div id="DP"></div><div class="dklbl" id="LBL_DESCARTE">DESCARTE</div></div>
     </div>
     <div id="MSG"></div>
   </div>
@@ -419,7 +420,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
     <div id="HUD"></div>
     <div id="ACT"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:0 4px">
-      <div class="plbl">Tu mano — toca para seleccionar · arrastra para ordenar <span id="MY_VOICE_IND" style="font-size:13px"></span></div>
+      <div class="plbl" id="LBL_HAND">Tu mano — toca para seleccionar · arrastra para ordenar <span id="MY_VOICE_IND" style="font-size:13px"></span></div>
       <button id="SORT_BTN" ontouchend="event.preventDefault();sortHand()" onclick="sortHand()" style="font-family:Cinzel,serif;font-size:8px;color:rgba(201,168,76,.6);border:1px solid rgba(201,168,76,.25);background:transparent;border-radius:4px;padding:2px 7px;cursor:pointer;white-space:nowrap;touch-action:manipulation;flex-shrink:0">⇕ Ordenar</button>
     </div>
     <div id="DISC_TAKEN_DIV" style="display:none;position:absolute;z-index:80;pointer-events:none"></div>
@@ -429,6 +430,289 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
   </div>
 </div>
 <script>
+// ══════════════════════════════════════════════════════
+// i18n — SISTEMA DE IDIOMAS
+// ══════════════════════════════════════════════════════
+const LANG={
+es:{
+  lbl_deck:'MAZO',lbl_discard:'DESCARTE',
+  hand_label:'Tu mano — toca para seleccionar · arrastra para ordenar',
+  sort_btn:'⇕ Ordenar',hist_btn_label:'📜 Historial',lang_btn:'EN',
+  menu_subtitle:'Elige cómo querés jugar',
+  menu_rules:'❓ ¿Cómo se juega? Ver reglas',
+  menu_solo:'🤖 Jugar con Bots',
+  menu_create:'🌐 Crear sala multijugador',
+  menu_join:'🔗 Unirse a sala',
+  menu_history:'📜 Ver historial de sala',
+  menu_about:'ℹ️ Acerca de Golpeado',
+  verifying:'⏳ Verificando...',
+  name_create_title:'🌐 Crear sala',name_join_title:'🔗 Unirse a sala',
+  name_label:'TU NOMBRE',name_placeholder:'Ej: Carlitos',
+  name_sala_label:'CÓDIGO DE SALA',name_sala_placeholder:'Ej: AB12CD',
+  name_back:'← Volver',name_create_btn:'Crear sala →',name_join_btn:'Entrar a la sala →',
+  name_err_empty:'Ingresá tu nombre para continuar.',name_err_sala:'Ingresá el código de sala.',
+  cred_title:'Acerca de Golpeado',
+  cred_origin:'Este juego está basado en el juego de naipes tradicional "Golpeado" tal como se juega en Cutervo, Cajamarca, Perú.',
+  cred_innovation:'Se agregó como innovación el comodín Grupal, una carta de doble filo: permite formar grupos pero quedarse con ambos comodines al final significa perder todo. Una decisión estratégica única.',
+  cred_dev:'DESARROLLADO POR',cred_back:'← Volver al menú',
+  hist_title:'Historial de partidas',
+  hist_search_ph:'CÓDIGO DE SALA (ej: AB12CD)',
+  hist_search_btn:'🔍 Buscar partidas',
+  hist_notice:'Las partidas se guardan <strong style="color:var(--gold)">7 días</strong> y luego se eliminan. Cada partida muestra cuánto tiempo le queda.',
+  hist_empty:'No hay partidas registradas para esta sala',
+  hist_expired:'Las partidas se guardan 7 días. Es posible que ya hayan sido eliminadas.',
+  hist_prompt:'Ingresá el código de sala y presioná Buscar',
+  hist_found:n=>`${n} partida${n!==1?'s':''} encontrada${n!==1?'s':''}`,
+  hist_tap_hint:'toca una para ver la mesa',
+  hist_tap_card:'👆 Toca para ver la mesa',
+  hist_sala:'SALA',hist_loading:'Cargando...',hist_close:'✕ Cerrar',
+  tr_process:'⚠️ En proceso de eliminación',
+  tr_hours:h=>`⚠️ Se elimina en ${h}h`,
+  tr_days2:(d,h)=>`⚠️ Se elimina en ${d} día${d!==1?'s':''} ${h}h`,
+  tr_days:d=>`🗓 Se elimina en ${d} días`,
+  act_golpe:'¡GOLPEADO!',act_take_disc:'Tomar descarte',act_draw:'Del mazo',
+  act_show_combo:'Mostrar combo',act_show_comb2:'Mostrar combinación',
+  act_discard:'Descartar',act_return:'↩ Devolver',act_waiting:'Esperando...',
+  act_done:'✓ Listo',act_undo:'↩',act_show_dn:'⬇ Bajar combo',act_fit:'🔗 Encajar',
+  act_results:'Ver resultados finales →',
+  act_results_wait:s=>`⏳ Ver resultados (${s}s)`,
+  act_timer:'⏱ Tiempo restante',
+  act_no_left_sure:'✅ ¡Sin sobrantes! — Confirmar Listo',
+  act_no_left:'✅ ¡Sin sobrantes! — Listo',
+  act_warn_left:p=>`⚠️ Confirmá Listo — ${p} pts sobrantes`,
+  act_left:p=>`✓ Listo — ${p} pts sobrantes`,
+  hint_sel1:'Selecciona 1 para descartar',
+  hint_sel1or3:'Selecciona 1 para descartar ó 3+ para combo',
+  hint_sel3:'Seleccioná 2+ cartas de tu mano para el combo',
+  hint_sel_min3:'Selecciona mín. 3 cartas (incluye la tomada)',
+  hint_sel_disc:'Selecciona 1 carta para descartar',
+  msg_dealing:'Repartiendo...',msg_shuffling:'Barajando las cartas...',
+  msg_first_turn:'Primer turno: seleccioná 1 carta para descartar y comenzar.',
+  msg_your_turn:'Tu turno: ¡GOLPEADO! · tomar descarte · tomar del mazo.',
+  msg_took_card:n=>`${n}: Tomaste una carta. Mostrá combo o seleccioná 1 carta para descartar.`,
+  msg_showed:n=>`${n}: ¡Combo mostrado! Ahora seleccioná 1 carta que no necesites y presioná Descartar.`,
+  msg_returned:n=>`${n}: Carta devuelta. Podés tomar del mazo o del descarte.`,
+  msg_sel_min:(n,m)=>`${n}: Seleccioná al menos ${m} cartas de tu mano para el combo.`,
+  msg_sel3:n=>`${n}: Seleccioná al menos 3 cartas.`,
+  msg_invalid:'No forman grupo ni escalera válida.',
+  msg_sel_discard:n=>`${n}: Seleccioná 1 carta para descartar.`,
+  msg_joker_ends:'El Joker solo puede ir al inicio o al final del combo.',
+  msg_joker_invalid:'El Joker no puede ir ahí — no formaría una secuencia válida.',
+  msg_undo:'↩ Acción deshecha.',
+  msg_empty_deck:'¡Mazo vacío! Barajando las cartas descartadas...',
+  msg_shuffling_disc:'Barajando descarte...',
+  msg_deck_rebuilt:n=>`${n}: Mazo rearmado. Podés tomar del mazo.`,
+  msg_deck_ok:'¡Mazo rearmado!',
+  msg_no_cards:'¡No quedan cartas!',
+  msg_combo_shown:t=>`¡Combo bajado! (${t}) — seguí o presioná Listo.`,
+  msg_sel_fit:'Seleccioná al menos 1 carta para encajar.',
+  msg_tap_combo:'Toca el combo destino donde querés encajar la carta (resaltados en amarillo).',
+  msg_fit_invalid:'Ese combo no acepta esta carta.',
+  msg_sorted_suit:'Mano ordenada por palo.',
+  msg_sorted_num:'Mano ordenada por número.',
+  msg_sorted_combo:'Mano ordenada: combos primero.',
+  msg_golpe:n=>`¡GOLPEADO declarado por ${n}! Mostrando juegos...`,
+  msg_all_shown:'¡Todos mostraron su juego! Presioná Ver resultados.',
+  msg_bot_thinking:n=>`Bot ${n} piensa...`,
+  msg_timeout:'⏱ ¡Tiempo agotado! Se registraron tus cartas como sobrantes.',
+  msg_bot_took_disc:n=>`${n} tomó el descarte y mostró combo.`,
+  msg_bot_swap:n=>`${n} intercambió cartas.`,
+  msg_wild_discard:n=>`${n} descartó un comodín.`,
+  msg_bot_discarded:n=>`${n} descartó.`,
+  msg_waiting_p1:'Esperando al primer jugador...',
+  msg_your_reveal:'Tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.',
+  msg_other_reveal:n=>`${n} está mostrando su juego...`,
+  msg_other_showed:(n,p)=>`${n} mostró su juego — sobrantes: ${p} pts.`,
+  msg_my_leftover:(n,p)=>`${n}: ${p} pts sobrantes.`,
+  msg_no_leftover:n=>`¡${n} sin sobrantes! Esperando...`,
+  fin_tie:'¡Empate!',fin_winner_you:'¡GANASTE!',fin_winner:n=>`¡${n} gana!`,
+  fin_new_game:'🔄 Jugar de nuevo',fin_menu:'🏠 Menú',
+  fin_tie_note:'Nadie gana en empate.',
+  fin_win_golpe:(n,p)=>`${n} ganó declarando GOLPEADO con ${p} pts — el menor puntaje.`,
+  fin_lost_golpe:(g,gp,wn,wp)=>`${g} declaró GOLPEADO pero no ganó — tenía ${gp} pts contra ${wp} pts de ${wn}. Gana ${wn} con ${wp} pts.`,
+  fin_winner_note:(n,p)=>`${n} gana con el menor puntaje: ${p} pts.`,
+  fin_penalties:'⚠️ PENALIZACIONES',
+  fin_pen_both_wilds:(n,s,a)=>`Usó ambos comodines (★ Joker + ✦ Grupal). Se suman <strong>+60 pts</strong> de penalización (${s} + 60 = <strong>${a} pts</strong>). <strong style="color:#E24B4A">Paga el doble de la apuesta.</strong>`,
+  fin_pen_golpe_lost:(g,gp,wn,wp)=>`Declaró GOLPEADO con <strong>${gp} pts</strong>. No ganó porque ${wn} tenía menos: <strong>${wp} pts</strong>. <strong style="color:#E24B4A">Paga el doble de la apuesta.</strong>`,
+  fin_pen_both:(g,gp,wn,wp)=>`Declaró GOLPEADO con <strong>${gp} pts</strong> pero ${wn} tenía menos: <strong>${wp} pts</strong>. Además usó ambos comodines (+60 pts). <strong style="color:#E24B4A">Paga el doble por ambas razones.</strong>`,
+  lob_loading:'Verificando disponibilidad...',lob_creating:'Creando sala...',
+  lob_searching:'Buscando sala...',lob_not_found:'Sala no encontrada. Verificá el código.',
+  lob_in_progress:'La partida ya está en curso. Si eras parte de esta sala, ingresá con el mismo nombre que usaste.',
+  lob_full:'La sala está llena (máx. 3 jugadores).',
+  lob_err_create:'Error creando sala: ',lob_err_join:'Error uniéndose: ',
+  srv_title:'SERVIDOR LLENO',srv_retry:'Reintentar en',srv_back:'← Volver',
+  htp_tab_obj:'🎯 Objetivo',htp_tab_tur:'🔄 Turno',htp_tab_com:'🃏 Combos',
+  htp_tab_gol:'👊 GOLPEADO',htp_tab_pen:'⚠️ Penaliz.',htp_close:'✓ Entendido',
+  rank_nobody:'Nadie en el ranking aún.\n¡Sé el primero!',rank_you:' ← tú',
+  rank_streak:'seguidas',rank_days_top:d=>`👑 ${d} en el top`,
+  rank_hoy:'hoy',rank_1dia:'1 día',rank_dias:d=>`${d} días`,
+},
+en:{
+  lbl_deck:'DECK',lbl_discard:'DISCARD',
+  hand_label:'Your hand — tap to select · drag to reorder',
+  sort_btn:'⇕ Sort',hist_btn_label:'📜 History',lang_btn:'ES',
+  menu_subtitle:'Choose how you want to play',
+  menu_rules:'❓ How to play? View rules',
+  menu_solo:'🤖 Play with Bots',
+  menu_create:'🌐 Create multiplayer room',
+  menu_join:'🔗 Join a room',
+  menu_history:'📜 View room history',
+  menu_about:'ℹ️ About Golpeado',
+  verifying:'⏳ Verifying...',
+  name_create_title:'🌐 Create room',name_join_title:'🔗 Join room',
+  name_label:'YOUR NAME',name_placeholder:'E.g.: Carlos',
+  name_sala_label:'ROOM CODE',name_sala_placeholder:'E.g.: AB12CD',
+  name_back:'← Back',name_create_btn:'Create room →',name_join_btn:'Enter room →',
+  name_err_empty:'Enter your name to continue.',name_err_sala:'Enter the room code.',
+  cred_title:'About Golpeado',
+  cred_origin:'This game is based on the traditional card game "Golpeado" as played in Cutervo, Cajamarca, Peru.',
+  cred_innovation:'The Group Wild was added as an innovation — a double-edged card: it allows forming groups, but holding both wild cards at the end means losing everything. A unique strategic decision.',
+  cred_dev:'DEVELOPED BY',cred_back:'← Back to menu',
+  hist_title:'Game History',
+  hist_search_ph:'ROOM CODE (e.g.: AB12CD)',
+  hist_search_btn:'🔍 Search games',
+  hist_notice:'Games are stored for <strong style="color:var(--gold)">7 days</strong> and then deleted. Each game shows time remaining.',
+  hist_empty:'No games recorded for this room',
+  hist_expired:'Games are stored 7 days. They may have already been deleted.',
+  hist_prompt:'Enter the room code and press Search',
+  hist_found:n=>`${n} game${n!==1?'s':''} found`,
+  hist_tap_hint:'tap one to view the table',
+  hist_tap_card:'👆 Tap to view the table',
+  hist_sala:'ROOM',hist_loading:'Loading...',hist_close:'✕ Close',
+  tr_process:'⚠️ Being deleted',
+  tr_hours:h=>`⚠️ Deleted in ${h}h`,
+  tr_days2:(d,h)=>`⚠️ Deleted in ${d} day${d!==1?'s':''} ${h}h`,
+  tr_days:d=>`🗓 Deleted in ${d} days`,
+  act_golpe:'GOLPEADO!',act_take_disc:'Take Discard',act_draw:'From Deck',
+  act_show_combo:'Show Combo',act_show_comb2:'Show Combination',
+  act_discard:'Discard',act_return:'↩ Return',act_waiting:'Waiting...',
+  act_done:'✓ Done',act_undo:'↩',act_show_dn:'⬇ Lay Down',act_fit:'🔗 Fit',
+  act_results:'View final results →',
+  act_results_wait:s=>`⏳ View results (${s}s)`,
+  act_timer:'⏱ Time left',
+  act_no_left_sure:'✅ No leftovers! — Confirm Done',
+  act_no_left:'✅ No leftovers! — Done',
+  act_warn_left:p=>`⚠️ Confirm Done — ${p} pts leftover`,
+  act_left:p=>`✓ Done — ${p} pts leftover`,
+  hint_sel1:'Select 1 to discard',
+  hint_sel1or3:'Select 1 to discard or 3+ for combo',
+  hint_sel3:'Select 2+ cards from your hand for the combo',
+  hint_sel_min3:'Select min. 3 cards (include taken card)',
+  hint_sel_disc:'Select 1 card to discard',
+  msg_dealing:'Dealing...',msg_shuffling:'Shuffling cards...',
+  msg_first_turn:'First turn: select 1 card to discard and start.',
+  msg_your_turn:'Your turn: GOLPEADO! · take discard · draw from deck.',
+  msg_took_card:n=>`${n}: Drew a card. Show a combo or select 1 card to discard.`,
+  msg_showed:n=>`${n}: Combo shown! Now select 1 card to discard.`,
+  msg_returned:n=>`${n}: Card returned. You can draw from deck or discard pile.`,
+  msg_sel_min:(n,m)=>`${n}: Select at least ${m} cards from your hand for the combo.`,
+  msg_sel3:n=>`${n}: Select at least 3 cards.`,
+  msg_invalid:"Cards don't form a valid group or run.",
+  msg_sel_discard:n=>`${n}: Select 1 card to discard.`,
+  msg_joker_ends:'The Joker can only go at the start or end of the combo.',
+  msg_joker_invalid:"The Joker can't go there — it wouldn't form a valid sequence.",
+  msg_undo:'↩ Action undone.',
+  msg_empty_deck:'Deck empty! Reshuffling discards...',
+  msg_shuffling_disc:'Reshuffling...',
+  msg_deck_rebuilt:n=>`${n}: Deck rebuilt. You can draw from deck.`,
+  msg_deck_ok:'Deck rebuilt!',
+  msg_no_cards:'No cards left!',
+  msg_combo_shown:t=>`Combo laid down! (${t}) — keep going or press Done.`,
+  msg_sel_fit:'Select at least 1 card to fit.',
+  msg_tap_combo:'Tap the target combo where you want to fit the card (highlighted in yellow).',
+  msg_fit_invalid:"That combo doesn't accept this card.",
+  msg_sorted_suit:'Hand sorted by suit.',
+  msg_sorted_num:'Hand sorted by number.',
+  msg_sorted_combo:'Hand sorted: combos first.',
+  msg_golpe:n=>`GOLPEADO declared by ${n}! Revealing hands...`,
+  msg_all_shown:'All hands revealed! Press View results.',
+  msg_bot_thinking:n=>`Bot ${n} thinking...`,
+  msg_timeout:"⏱ Time's up! Your cards were recorded as leftovers.",
+  msg_bot_took_disc:n=>`${n} took the discard and showed combo.`,
+  msg_bot_swap:n=>`${n} swapped cards.`,
+  msg_wild_discard:n=>`${n} discarded a wild.`,
+  msg_bot_discarded:n=>`${n} discarded.`,
+  msg_waiting_p1:'Waiting for first player...',
+  msg_your_reveal:'Your turn to reveal — select cards to lay down or fit.',
+  msg_other_reveal:n=>`${n} is revealing their hand...`,
+  msg_other_showed:(n,p)=>`${n} revealed — leftovers: ${p} pts.`,
+  msg_my_leftover:(n,p)=>`${n}: ${p} pts leftover.`,
+  msg_no_leftover:n=>`${n} with no leftovers! Waiting...`,
+  fin_tie:'Tie!',fin_winner_you:'YOU WIN!',fin_winner:n=>`${n} wins!`,
+  fin_new_game:'🔄 Play again',fin_menu:'🏠 Menu',
+  fin_tie_note:'Nobody wins in a tie.',
+  fin_win_golpe:(n,p)=>`${n} won by declaring GOLPEADO with ${p} pts — the lowest score.`,
+  fin_lost_golpe:(g,gp,wn,wp)=>`${g} declared GOLPEADO but didn't win — had ${gp} pts vs ${wn}'s ${wp} pts. ${wn} wins with ${wp} pts.`,
+  fin_winner_note:(n,p)=>`${n} wins with the lowest score: ${p} pts.`,
+  fin_penalties:'⚠️ PENALTIES',
+  fin_pen_both_wilds:(n,s,a)=>`Used both wilds (★ Joker + ✦ Group Wild). <strong>+60 pts</strong> penalty added (${s} + 60 = <strong>${a} pts</strong>). <strong style="color:#E24B4A">Pays double the bet.</strong>`,
+  fin_pen_golpe_lost:(g,gp,wn,wp)=>`Declared GOLPEADO with <strong>${gp} pts</strong>. Didn't win because ${wn} had less: <strong>${wp} pts</strong>. <strong style="color:#E24B4A">Pays double the bet.</strong>`,
+  fin_pen_both:(g,gp,wn,wp)=>`Declared GOLPEADO with <strong>${gp} pts</strong> but ${wn} had less: <strong>${wp} pts</strong>. Also used both wilds (+60 pts). <strong style="color:#E24B4A">Pays double for both reasons.</strong>`,
+  lob_loading:'Checking availability...',lob_creating:'Creating room...',
+  lob_searching:'Looking for room...',lob_not_found:'Room not found. Check the code.',
+  lob_in_progress:'Game already in progress. If you were in this room, enter with the same name.',
+  lob_full:'Room is full (max. 3 players).',
+  lob_err_create:'Error creating room: ',lob_err_join:'Error joining: ',
+  srv_title:'SERVER FULL',srv_retry:'Retry in',srv_back:'← Back',
+  htp_tab_obj:'🎯 Objective',htp_tab_tur:'🔄 Turn',htp_tab_com:'🃏 Combos',
+  htp_tab_gol:'👊 GOLPEADO',htp_tab_pen:'⚠️ Penalties',htp_close:'✓ Got it',
+  rank_nobody:"Nobody in the ranking yet.\nBe the first!",rank_you:' ← you',
+  rank_streak:'in a row',rank_days_top:d=>`👑 ${d} in the top`,
+  rank_hoy:'today',rank_1dia:'1 day',rank_dias:d=>`${d} days`,
+}
+};
+
+let _lang='es';
+try{_lang=localStorage.getItem('golpeado_lang')||'es';}catch(e){}
+
+function t(key,...args){
+  const d=LANG[_lang]||LANG.es;
+  const v=d[key]!==undefined?d[key]:LANG.es[key];
+  if(v===undefined)return key;
+  return typeof v==='function'?v(...args):v;
+}
+
+function setLang(lang){
+  _lang=lang;
+  try{localStorage.setItem('golpeado_lang',lang);}catch(e){}
+  _applyLangStatic();
+  _refreshLangScreen();
+}
+
+function _applyLangStatic(){
+  const el=id=>{const e=document.getElementById(id);return e;};
+  const set=(id,txt)=>{const e=el(id);if(e)e.textContent=txt;};
+  set('LBL_MAZO',t('lbl_deck'));
+  set('LBL_DESCARTE',t('lbl_discard'));
+  set('SORT_BTN',t('sort_btn'));
+  set('LANG_BTN',t('lang_btn'));
+  set('CUENTAS_BTN',_lang==='en'?'💰 Accounts':'💰 Cuentas');
+  const hb=el('HIST_BTN');if(hb)hb.textContent=t('hist_btn_label');
+  const lh=el('LBL_HAND');
+  if(lh){
+    lh.innerHTML=t('hand_label')+' <span id="MY_VOICE_IND" style="font-size:13px">'+((document.getElementById('MY_VOICE_IND')||{}).textContent||'')+'</span>';
+  }
+}
+
+function _refreshLangScreen(){
+  if(document.getElementById('MODE_OV')){showModeScreen();return;}
+  if(document.getElementById('CREDITS_OV')){showCreditsOv();return;}
+  if(document.getElementById('RANKING_OV')){rmEl('RANKING_OV');showRankingScreen();return;}
+  if(document.getElementById('CUE_OV')){rmEl('CUE_OV');showCuentas();return;}
+  if(document.getElementById('HIST_OV')){
+    const q=(document.getElementById('HIST_SEARCH')||{}).value||'';
+    rmEl('HIST_OV');showHistorialOv(q);return;
+  }
+  if(document.getElementById('HTP_OV')){rmEl('HTP_OV');showHowToPlay();return;}
+  if(document.getElementById('NOM_OV')){
+    const accion=document.getElementById('NOM_OK')?
+      (document.getElementById('SALA_INPUT')?'unir':'crear'):'crear';
+    rmEl('NOM_OV');showNombreScreen(accion);return;
+  }
+  // juego en curso
+  if(typeof redraw==='function')redraw();
+}
+
 // Bloquear orientación vertical
 try{
   if(screen.orientation&&screen.orientation.lock){
@@ -1023,7 +1307,13 @@ function getJokerValue(combo){
   const right=rightCards[0];
   if(left&&right)return val(left)+1;
   if(left&&!right)return val(left)+1;
-  if(!left&&right)return val(right)-1;
+  if(!left&&right){
+    // Caso circular: Joker al extremo izquierdo, vecino derecho es As,
+    // y hay cartas bajas (2-9) en el combo → escalera K,A,2,3,... → Joker=K=13
+    const hasLowCards=nonJ.some(c=>c.n>=2&&c.n<=9);
+    if(right.n===1&&hasLowCards)return 13;
+    return val(right)-1;
+  }
   return -1;
 }
 
@@ -1036,7 +1326,7 @@ function tryJokerMove(combo,fromIdx,toIdx){
   const newLen=ord.length; // el largo no cambia al mover
   const esExtremo=(toIdx===0||toIdx===newLen-1);
   if(!esExtremo){
-    S.msg='El Joker solo puede ir al inicio o al final del combo.';
+    S.msg=t('msg_joker_ends');
     redraw();return;
   }
   const newOrd=[...ord];
@@ -1047,7 +1337,7 @@ function tryJokerMove(combo,fromIdx,toIdx){
     sndCard(0.3);
     S.msg='';
   } else {
-    S.msg='El Joker no puede ir ahí — no formaría una secuencia válida.';
+    S.msg=t('msg_joker_invalid');
   }
   redraw();
 }
@@ -1088,8 +1378,8 @@ function showWinnerAnimation(callback){
   if(tie){
     ov.innerHTML=`
       <div class="winner-trophy" style="filter:grayscale(.3)">🤝</div>
-      <div class="winner-name" style="color:#C9A84C">¡EMPATE!</div>
-      <div class="winner-sub" style="color:rgba(232,220,200,.7)">Nadie gana esta ronda</div>`;
+      <div class="winner-name" style="color:#C9A84C">${t('fin_tie')}</div>
+      <div class="winner-sub" style="color:rgba(232,220,200,.7)">${t('fin_tie_note')}</div>`;
   } else {
     const w=winners[0];
     const esYo=w===0;
@@ -1097,8 +1387,8 @@ function showWinnerAnimation(callback){
     const color=PCOLOR[w];
     ov.innerHTML=`
       <div class="winner-trophy">🏆</div>
-      <div class="winner-name" style="color:${color}">${esYo?'¡GANASTE!':'¡'+nombre+' gana!'}</div>
-      <div class="winner-sub" style="color:rgba(232,220,200,.7)">con ${adj[w]} pts — el menor puntaje</div>`;
+      <div class="winner-name" style="color:${color}">${esYo?t('fin_winner_you'):t('fin_winner',nombre)}</div>
+      <div class="winner-sub" style="color:rgba(232,220,200,.7)">${_lang==='en'?`with ${adj[w]} pts — lowest score`:`con ${adj[w]} pts — el menor puntaje`}</div>`;
     // Chispas de colores
     const colors=['#FFD700','#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD'];
     for(let i=0;i<18;i++){
@@ -1257,36 +1547,31 @@ function historialFechaLabel(fechaStr){
   }catch(e){return fechaStr||'';}
 }
 
-// Calcula cuánto tiempo le queda a un registro antes de ser eliminado (retención: 6 meses)
+// Calcula cuánto tiempo le queda a un registro antes de ser eliminado (retención: 7 días)
 function tiempoRestanteLabel(fechaStr){
   try{
-    const expira=new Date(fechaStr);
-    expira.setMonth(expira.getMonth()+6);
+    const expira=new Date(new Date(fechaStr).getTime()+7*24*3600000);
     const ms=expira-Date.now();
-    if(ms<=0)return{texto:'⚠️ En proceso de eliminación',urgente:true};
+    if(ms<=0)return{texto:t('tr_process'),urgente:true};
     const dias=Math.floor(ms/(1000*60*60*24));
-    if(dias<=7)return{texto:`⚠️ Se elimina en ${dias} día${dias!==1?'s':''}`,urgente:true};
-    if(dias<=30)return{texto:`⏳ Se elimina en ${dias} días`,urgente:false};
-    const meses=Math.round(dias/30);
-    return{texto:`🗓 Se conserva ${meses} mes${meses!==1?'es':''} más`,urgente:false};
+    const horas=Math.floor((ms%(1000*60*60*24))/(1000*60*60));
+    if(dias===0)return{texto:t('tr_hours',horas),urgente:true};
+    if(dias<=2)return{texto:t('tr_days2',dias,horas),urgente:true};
+    return{texto:t('tr_days',dias),urgente:false};
   }catch(e){return{texto:'',urgente:false};}
 }
 
-// Elimina registros de historial y salas con más de 6 meses de antigüedad
+// Elimina registros de historial y salas con más de 7 días de antigüedad
 async function limpiarDatosAntiguos(){
   try{
-    const corte=new Date();
-    corte.setMonth(corte.getMonth()-6);
-    const cutoff=corte.toISOString();
+    const cutoff=new Date(Date.now()-7*24*3600000).toISOString();
     await sbFetchMinimal('/rest/v1/historial?fecha=lt.'+encodeURIComponent(cutoff),'DELETE');
     console.log('[CLEANUP] Historial antiguo eliminado (corte:',cutoff,')');
   }catch(e){
     console.log('[CLEANUP] historial:',e.message);
   }
   try{
-    const corte=new Date();
-    corte.setMonth(corte.getMonth()-6);
-    const cutoff=corte.toISOString();
+    const cutoff=new Date(Date.now()-7*24*3600000).toISOString();
     await sbFetchMinimal('/rest/v1/salas?created_at=lt.'+encodeURIComponent(cutoff),'DELETE');
     console.log('[CLEANUP] Salas antiguas eliminadas');
   }catch(e){
@@ -1310,6 +1595,70 @@ async function limpiarDatosAntiguos(){
 //   CREATE INDEX IF NOT EXISTS sesiones_tipo_idx ON sesiones (tipo, created_at);
 //   ALTER TABLE sesiones ENABLE ROW LEVEL SECURITY;
 //   CREATE POLICY "allow_all" ON sesiones FOR ALL USING (true) WITH CHECK (true);
+
+// ══════════════════════════════════════════════════════
+// SISTEMA DE VISITAS — para estadísticas reales de jugadores
+// ══════════════════════════════════════════════════════
+// SQL para crear la tabla (ejecutar una sola vez en Supabase → SQL Editor):
+//   CREATE TABLE IF NOT EXISTS visitas (
+//     id TEXT PRIMARY KEY,
+//     tipo TEXT NOT NULL,
+//     pais TEXT,
+//     bandera TEXT,
+//     ip_hash TEXT,
+//     created_at TIMESTAMPTZ DEFAULT NOW()
+//   );
+//   CREATE INDEX IF NOT EXISTS visitas_tipo_idx ON visitas (tipo, created_at);
+//   CREATE INDEX IF NOT EXISTS visitas_pais_idx ON visitas (pais);
+//   ALTER TABLE visitas ENABLE ROW LEVEL SECURITY;
+//   CREATE POLICY "allow_all" ON visitas FOR ALL USING (true) WITH CHECK (true);
+
+let _geoCache=null;
+
+async function obtenerGeoIP(){
+  if(_geoCache)return _geoCache;
+  try{
+    const r=await fetch('https://ipapi.co/json/',{signal:AbortSignal.timeout(4000)});
+    if(!r.ok)throw new Error('geo fail');
+    const d=await r.json();
+    _geoCache={
+      pais:d.country_name||'Desconocido',
+      bandera:d.country_name?countryToFlag(d.country_code):'🌍',
+      ip_hash:await hashStr(d.ip||'')
+    };
+  }catch(e){
+    _geoCache={pais:'Desconocido',bandera:'🌍',ip_hash:''};
+  }
+  return _geoCache;
+}
+
+function countryToFlag(code){
+  if(!code||code.length!==2)return'🌍';
+  try{
+    return String.fromCodePoint(...[...code.toUpperCase()].map(c=>0x1F1E0+c.charCodeAt(0)-65));
+  }catch(e){return'🌍';}
+}
+
+async function hashStr(str){
+  if(!str)return'';
+  try{
+    const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).slice(0,8).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch(e){return'';}
+}
+
+async function registrarVisita(tipo){
+  try{
+    const geo=await obtenerGeoIP();
+    const id='V'+Math.random().toString(36).slice(2,16).toUpperCase();
+    await sbFetchMinimal('/rest/v1/visitas','POST',{
+      id,tipo,
+      pais:geo.pais,
+      bandera:geo.bandera,
+      ip_hash:geo.ip_hash
+    });
+  }catch(e){console.log('[VISITA] error:',e.message);}
+}
 
 const LIMITE_SOLO=100;
 const LIMITE_MULTI=50;
@@ -1368,24 +1717,24 @@ function showServidorLleno(tipo,onReintentar){
   ov.style.cssText='position:absolute;inset:0;background:rgba(5,5,15,.98);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:810;padding:28px;text-align:center';
   const esSolo=tipo==='solo';
   const limite=esSolo?LIMITE_SOLO:LIMITE_MULTI;
-  const tipoLabel=esSolo?'partidas con bots':'salas multijugador';
+  const tipoLabel=esSolo?(_lang==='en'?'bot games':'partidas con bots'):(_lang==='en'?'multiplayer rooms':'salas multijugador');
   const icono=esSolo?'🤖':'🌐';
   const detalle=esSolo
-    ?`Hay ${limite} partidas locales activas en este momento.`
-    :`Hay ${limite} salas online activas en este momento.`;
+    ?(_lang==='en'?`There are ${limite} active local games right now.`:`Hay ${limite} partidas locales activas en este momento.`)
+    :(_lang==='en'?`There are ${limite} active online rooms right now.`:`Hay ${limite} salas online activas en este momento.`);
   ov.innerHTML=`
     <div style="font-size:54px;line-height:1;filter:grayscale(.3)">${icono}</div>
-    <div style="font-family:Cinzel,serif;font-size:20px;font-weight:700;color:#E24B4A;letter-spacing:.07em;text-shadow:0 0 20px rgba(226,75,74,.5)">SERVIDOR LLENO</div>
+    <div style="font-family:Cinzel,serif;font-size:20px;font-weight:700;color:#E24B4A;letter-spacing:.07em;text-shadow:0 0 20px rgba(226,75,74,.5)">${t('srv_title')}</div>
     <div style="font-size:11px;color:rgba(232,220,200,.75);max-width:230px;line-height:1.8">
-      Se alcanzó el límite de<br><strong style="color:var(--gold);font-size:13px">${limite} ${tipoLabel}</strong><br>simultáneas.
+      ${_lang==='en'?`The limit of`:'Se alcanzó el límite de'}<br><strong style="color:var(--gold);font-size:13px">${limite} ${tipoLabel}</strong><br>${_lang==='en'?'has been reached.':'simultáneas.'}
     </div>
-    <div style="font-size:10px;color:rgba(232,220,200,.35);max-width:230px;line-height:1.6">${detalle}<br>Volvé en unos minutos e intentá de nuevo.</div>
+    <div style="font-size:10px;color:rgba(232,220,200,.35);max-width:230px;line-height:1.6">${detalle}<br>${_lang==='en'?'Come back in a few minutes and try again.':'Volvé en unos minutos e intentá de nuevo.'}</div>
     <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 18px;font-family:Cinzel,serif;font-size:10px;color:rgba(232,220,200,.45)">
-      ⏱ Reintentando automáticamente en <span id="SLL_SEGS" style="color:var(--gold);font-weight:700">30</span>s
+      ⏱ ${t('srv_retry')} <span id="SLL_SEGS" style="color:var(--gold);font-weight:700">30</span>s
     </div>
     <div style="display:flex;gap:10px;width:100%;max-width:260px">
-      <button id="SLL_BACK" style="flex:1;padding:11px;border-radius:7px;border:1.5px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:11px;cursor:pointer;touch-action:manipulation">← Volver</button>
-      <button id="SLL_RETRY" style="flex:2;padding:11px;border-radius:7px;border:none;background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 12px rgba(201,168,76,.4)">🔄 Reintentar</button>
+      <button id="SLL_BACK" style="flex:1;padding:11px;border-radius:7px;border:1.5px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:11px;cursor:pointer;touch-action:manipulation">${t('srv_back')}</button>
+      <button id="SLL_RETRY" style="flex:2;padding:11px;border-radius:7px;border:none;background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 12px rgba(201,168,76,.4)">🔄 ${_lang==='en'?'Retry':'Reintentar'}</button>
     </div>
   `;
   $('G').appendChild(ov);
@@ -1426,9 +1775,9 @@ function mkHistorialCard(row){
     });
     gananciaText=`💰 Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} · ${d.ganador} cobró <strong style="color:var(--gold)">${total}</strong> ficha${total>1?'s':''}`;
   } else if(d.tie&&d.apuesta>0){
-    gananciaText=`💰 Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} · devueltas por empate`;
+    gananciaText=`💰 ${_lang==='en'?`Bet: ${d.apuesta} chip${d.apuesta>1?'s':''} · returned (tie)`:`Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} · devueltas por empate`}`;
   } else if(d.apuesta===0){
-    gananciaText='Sin apuesta';
+    gananciaText=_lang==='en'?'No bet':'Sin apuesta';
   }
 
   const tr=tiempoRestanteLabel(row.fecha);
@@ -1436,12 +1785,12 @@ function mkHistorialCard(row){
   div.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <span style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:${ganadorColor}">${ganadorText}</span>
-      <span style="font-size:9px;color:rgba(232,220,200,.35)">${historialFechaLabel(row.fecha)}</span>
+      <span style="font-size:9px;color:rgba(232,220,200,.6)">${historialFechaLabel(row.fecha)}</span>
     </div>
-    <div style="font-size:9px;color:rgba(232,220,200,.6);line-height:1.6;margin-bottom:3px">${jugLista}</div>
-    <div style="font-size:8px;color:rgba(201,168,76,.6)">${gananciaText}</div>
-    ${tr.texto?`<div style="font-size:8px;color:${trColor};margin-top:3px">${tr.texto}</div>`:''}
-    <div style="font-size:8px;color:rgba(74,158,232,.5);margin-top:3px;text-align:right">👆 Toca para ver la mesa</div>
+    <div style="font-size:10px;color:rgba(232,220,200,.85);line-height:1.6;margin-bottom:3px">${jugLista}</div>
+    <div style="font-size:9px;color:rgba(201,168,76,.85)">${gananciaText}</div>
+    ${tr.texto?`<div style="font-size:9px;font-weight:600;color:${trColor};margin-top:3px">${tr.texto}</div>`:''}
+    <div style="font-size:8px;color:rgba(74,158,232,.65);margin-top:3px;text-align:right">${t('hist_tap_card')}</div>
   `;
   div.addEventListener('click',()=>showHistorialMesa(row));
   div.addEventListener('touchend',e=>{e.preventDefault();showHistorialMesa(row);},{passive:false});
@@ -1489,11 +1838,11 @@ function showHistorialMesa(row){
     <div style="background:rgba(0,0,0,0.55);border-bottom:1px solid rgba(232,220,200,.1);padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0">
       <span style="font-size:16px">📜</span>
       <div style="flex:1">
-        <div style="font-family:Cinzel,serif;font-size:10px;color:rgba(201,168,76,.85);font-weight:700;letter-spacing:.05em">PARTIDA HISTÓRICA — SALA ${d.sala_id||''}</div>
+        <div style="font-family:Cinzel,serif;font-size:10px;color:rgba(201,168,76,.85);font-weight:700;letter-spacing:.05em">${_lang==='en'?'HISTORIC GAME':'PARTIDA HISTÓRICA'} — ${t('hist_sala')} ${d.sala_id||''}</div>
         <div style="font-size:8px;color:rgba(232,220,200,.35)">${historialFechaLabel(row.fecha)}</div>
-        ${(()=>{const tr=tiempoRestanteLabel(row.fecha);return tr.texto?`<div style="font-size:8px;color:${tr.urgente?'rgba(226,75,74,.8)':'rgba(232,220,200,.3)'};margin-top:1px">${tr.texto}</div>`:''})()}
+        ${(()=>{const tr=tiempoRestanteLabel(row.fecha);return tr.texto?`<div style="font-size:9px;font-weight:600;color:${tr.urgente?'rgba(226,75,74,.9)':'rgba(232,220,200,.7)'};margin-top:1px">${tr.texto}</div>`:''})()}
       </div>
-      <button id="HIST_MESA_CLO" style="background:rgba(226,75,74,.2);border:1.5px solid rgba(226,75,74,.6);border-radius:6px;color:#E24B4A;font-size:11px;font-weight:700;padding:6px 14px;cursor:pointer;font-family:Cinzel,serif;touch-action:manipulation">✕ Cerrar</button>
+      <button id="HIST_MESA_CLO" style="background:rgba(226,75,74,.2);border:1.5px solid rgba(226,75,74,.6);border-radius:6px;color:#E24B4A;font-size:11px;font-weight:700;padding:6px 14px;cursor:pointer;font-family:Cinzel,serif;touch-action:manipulation">✕ ${t('hist_close')}</button>
     </div>
     <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
       <div id="HM_RESULTADO" style="flex-shrink:0;padding:8px 12px;text-align:center;border-bottom:1px solid rgba(232,220,200,.08);background:rgba(0,0,0,0.3)"></div>
@@ -1628,17 +1977,17 @@ async function showHistorialOv(salaIdInicial=''){
   ov.innerHTML=`
     <div class="hist-banner">
       <span style="font-size:20px">📜</span>
-      <div style="flex:1;font-family:Cinzel,serif;font-size:13px;font-weight:700;color:rgba(232,220,200,.9)">Historial de partidas</div>
-      <button id="HIST_CLO" style="background:rgba(226,75,74,.2);border:1.5px solid rgba(226,75,74,.6);border-radius:6px;color:#E24B4A;font-size:11px;font-weight:700;padding:6px 14px;cursor:pointer;font-family:Cinzel,serif;touch-action:manipulation">✕ Cerrar</button>
+      <div style="flex:1;font-family:Cinzel,serif;font-size:13px;font-weight:700;color:rgba(232,220,200,.9)">${t('hist_title')}</div>
+      <button id="HIST_CLO" style="background:rgba(226,75,74,.2);border:1.5px solid rgba(226,75,74,.6);border-radius:6px;color:#E24B4A;font-size:11px;font-weight:700;padding:6px 14px;cursor:pointer;font-family:Cinzel,serif;touch-action:manipulation">✕ ${t('hist_close')}</button>
     </div>
     <div style="padding:10px 12px;border-bottom:1px solid rgba(232,220,200,.08);flex-shrink:0">
-      <input id="HIST_SEARCH" placeholder="CÓDIGO DE SALA (ej: AB12CD)" maxlength="8" value="${salaIdInicial.toUpperCase()}">
-      <button id="HIST_BUSCAR" style="width:100%;margin-top:7px;padding:8px;border-radius:7px;border:1.5px solid rgba(201,168,76,.5);background:transparent;color:var(--gold);font-family:Cinzel,serif;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation">🔍 Buscar partidas</button>
-      <div style="margin-top:6px;padding:6px 8px;border-radius:6px;background:rgba(232,220,200,.05);border:1px solid rgba(232,220,200,.1);font-size:8px;color:rgba(232,220,200,.4);line-height:1.5;font-family:Cinzel,serif;letter-spacing:.02em">🗓 Las partidas se guardan por <strong style="color:rgba(232,220,200,.6)">6 meses</strong> y luego se eliminan automáticamente. Cada partida muestra cuánto tiempo le queda.</div>
+      <input id="HIST_SEARCH" placeholder="${t('hist_search_ph')}" maxlength="8" value="${salaIdInicial.toUpperCase()}">
+      <button id="HIST_BUSCAR" style="width:100%;margin-top:7px;padding:8px;border-radius:7px;border:1.5px solid rgba(201,168,76,.5);background:transparent;color:var(--gold);font-family:Cinzel,serif;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation">${t('hist_search_btn')}</button>
+      <div style="margin-top:6px;padding:6px 8px;border-radius:6px;background:rgba(232,220,200,.06);border:1px solid rgba(201,168,76,.2);font-size:9px;color:rgba(232,220,200,.75);line-height:1.5;font-family:Cinzel,serif;letter-spacing:.02em">${t('hist_notice')}</div>
     </div>
     <div class="hist-body" id="HIST_BODY">
       <div style="text-align:center;color:rgba(232,220,200,.3);font-size:11px;padding:30px 0">
-        Ingresá el código de sala y presioná Buscar
+        ${t('hist_prompt')}
       </div>
     </div>
   `;
@@ -1655,17 +2004,18 @@ async function showHistorialOv(salaIdInicial=''){
   const buscar=async()=>{
     const sala=(searchInput.value||'').trim().toUpperCase();
     if(!sala){return;}
+    searchInput.blur();
     const body=ov.querySelector('#HIST_BODY');
-    body.innerHTML='<div style="text-align:center;color:rgba(232,220,200,.4);font-size:11px;padding:20px">Cargando...</div>';
+    body.innerHTML=`<div style="text-align:center;color:rgba(232,220,200,.4);font-size:11px;padding:20px">${t('hist_loading')}</div>`;
     const rows=await historialCargar(sala);
     body.innerHTML='';
     if(!rows.length){
-      body.innerHTML='<div style="text-align:center;color:rgba(232,220,200,.3);font-size:11px;padding:30px 0">No hay partidas registradas para esta sala<div style="font-size:9px;margin-top:8px;color:rgba(232,220,200,.2)">Las partidas se guardan por 6 meses. Es posible que las partidas de esta sala ya hayan sido eliminadas.</div></div>';
+      body.innerHTML=`<div style="text-align:center;color:rgba(232,220,200,.5);font-size:11px;padding:30px 0">${t('hist_empty')}<div style="font-size:9px;margin-top:8px;color:rgba(232,220,200,.4)">${t('hist_expired')}</div></div>`;
       return;
     }
     const titulo=document.createElement('div');
     titulo.style.cssText='font-size:9px;color:rgba(232,220,200,.35);font-family:Cinzel,serif;margin-bottom:6px';
-    titulo.textContent=rows.length+' partida'+(rows.length!==1?'s':'')+' encontrada'+(rows.length!==1?'s':'')+' — toca una para ver la mesa';
+    titulo.textContent=t('hist_found',rows.length)+' — '+t('hist_tap_hint');
     body.appendChild(titulo);
     rows.forEach(row=>{
       const card=mkHistorialCard(row);
@@ -1697,10 +2047,10 @@ function showPenaltyAnimation(penalties,callback){
     const ov=document.createElement('div');ov.className='penalty-overlay';ov.id='PNLT_OV';
     ov.innerHTML=`
       <div class="penalty-icon">⚠️</div>
-      <div class="penalty-title" style="color:${p.color}">¡PENALIZACIÓN!</div>
+      <div class="penalty-title" style="color:${p.color}">${_lang==='en'?'PENALTY!':'¡PENALIZACIÓN!'}</div>
       <div class="penalty-sub">
         <span style="color:${p.color};font-weight:700">${p.name}</span><br>
-        paga el doble<br>
+        ${_lang==='en'?'pays double':'paga el doble'}<br>
         <span style="font-size:.85em;opacity:.8">${p.reason}</span>
       </div>`;
     G.appendChild(ov);
@@ -1731,9 +2081,9 @@ function detectPenalties(){
       // Si perdió y tiene comodines: paga doble
       const esGanador=winners.includes(i)&&!tie;
       let reason='';
-      if(golpoSinGanar&&tieneComodines)reason='declaró GOLPEADO sin ganar y usó 2 comodines';
-      else if(golpoSinGanar)reason='declaró GOLPEADO pero no ganó';
-      else reason='usó los 2 comodines (★ Joker + ✦ Comodín grupal)';
+      if(golpoSinGanar&&tieneComodines)reason=_lang==='en'?'declared GOLPEADO without winning & used 2 wilds':'declaró GOLPEADO sin ganar y usó 2 comodines';
+      else if(golpoSinGanar)reason=_lang==='en'?'declared GOLPEADO but didn\'t win':'declaró GOLPEADO pero no ganó';
+      else reason=_lang==='en'?'used both wilds (★ Joker + ✦ Group Wild)':'usó los 2 comodines (★ Joker + ✦ Comodín grupal)';
       penalties.push({name:PNAME(i),reason,color:PCOLOR[i],esGanador});
     }
   }
@@ -1813,7 +2163,7 @@ function startRevTimer(){
       clearRevTimer();
       // tiempo agotado: listo automático
       if(S.phase==='golpeado_reveal'&&S._revPid===0&&!S.over){
-        S.msg='⏱ ¡Tiempo agotado! Se registraron tus cartas como sobrantes.';
+        S.msg=t('msg_timeout');
         doListo();
       }
     }
@@ -1861,7 +2211,7 @@ function showBetScreen(){
 
   ov.innerHTML=`
     <div style="width:100%;max-width:340px;padding:20px 16px 0;display:flex;flex-direction:column;align-items:center;gap:12px;flex-shrink:0">
-      <div style="font-family:Cinzel,serif;font-size:18px;color:var(--gold);letter-spacing:.1em;margin-top:4px">Apuesta</div>
+      <div style="font-family:Cinzel,serif;font-size:18px;color:var(--gold);letter-spacing:.1em;margin-top:4px">${_lang==='en'?'Bet':'Apuesta'}</div>
       ${MP.mode==='solo'?`<div id="CHALLENGE_BOX" style="position:relative;width:100%;overflow:hidden;border-radius:10px;border:1px solid rgba(226,75,74,.4);background:linear-gradient(135deg,rgba(40,10,10,.95),rgba(20,5,5,.98));padding:14px 12px 12px;text-align:center">
         <!-- Humo SVG animado -->
         <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.55" viewBox="0 0 340 90" xmlns="http://www.w3.org/2000/svg">
@@ -1924,36 +2274,35 @@ function showBetScreen(){
           <div style="font-size:22px;margin-bottom:4px;
             animation:challengePulse 2s ease-in-out infinite">😤🔥</div>
           <div style="font-family:Cinzel,serif;font-size:11px;color:rgba(255,160,140,.95);line-height:1.6;font-weight:700;letter-spacing:.03em">
-            ¿Creés que podés ganarme<br>más de
-            <span style="color:#ff6b4a;font-size:14px;text-shadow:0 0 8px rgba(255,100,50,.8)">2 veces seguidas</span>?
+            ${_lang==='en'?`Think you can beat me<br>more than <span style="color:#ff6b4a;font-size:14px;text-shadow:0 0 8px rgba(255,100,50,.8)">2 times in a row</span>?`:`¿Creés que podés ganarme<br>más de <span style="color:#ff6b4a;font-size:14px;text-shadow:0 0 8px rgba(255,100,50,.8)">2 veces seguidas</span>?`}
           </div>
           <div style="font-family:Cinzel,serif;font-size:12px;color:rgba(255,100,60,.9);margin-top:3px;font-weight:700;
             text-shadow:0 0 10px rgba(255,80,40,.5);letter-spacing:.05em">
-            ¡¡INTÉNTALO!!
+            ${_lang==='en'?'TRY IT!!':'¡¡INTÉNTALO!!'}
           </div>
           <div style="font-size:9px;color:rgba(232,220,200,.4);margin-top:5px;font-style:italic;letter-spacing:.04em">
-            Solo los mejores llegan al ranking
+            ${_lang==='en'?'Only the best reach the ranking':'Solo los mejores llegan al ranking'}
           </div>
         </div>
       </div>`:''}
-      <div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center">Elegí el valor de la ficha para esta partida.</div>
+      <div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center">${_lang==='en'?'Pick a chip value for this game.':'Elegí el valor de la ficha para esta partida.'}</div>
       <div id="CHIP_ROW" style="position:relative;width:100%;height:110px;display:flex;align-items:flex-end;justify-content:center"></div>
-      <div id="BET_INFO" style="font-family:Cinzel,serif;font-size:13px;color:rgba(232,220,200,.4)">Seleccioná una ficha</div>
+      <div id="BET_INFO" style="font-family:Cinzel,serif;font-size:13px;color:rgba(232,220,200,.4)">${_lang==='en'?'Select a chip':'Seleccioná una ficha'}</div>
       <div style="display:flex;gap:10px;width:100%">
-        <button id="BET_BACK" style="flex:0 0 auto;padding:10px 8px;border-radius:6px;border:1.5px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.45);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">← Volver</button>
-        <button id="BET_SKIP" style="flex:1;padding:10px;border-radius:6px;border:1.5px solid rgba(232,220,200,.3);background:transparent;color:rgba(232,220,200,.5);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">Sin apuesta</button>
-        <button id="BET_OK" disabled style="flex:2;padding:10px;border-radius:6px;border:1.5px solid var(--gold);background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;opacity:.4">Jugar →</button>
+        <button id="BET_BACK" style="flex:0 0 auto;padding:10px 8px;border-radius:6px;border:1.5px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.45);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">← ${_lang==='en'?'Back':'Volver'}</button>
+        <button id="BET_SKIP" style="flex:1;padding:10px;border-radius:6px;border:1.5px solid rgba(232,220,200,.3);background:transparent;color:rgba(232,220,200,.5);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">${_lang==='en'?'No bet':'Sin apuesta'}</button>
+        <button id="BET_OK" disabled style="flex:2;padding:10px;border-radius:6px;border:1.5px solid var(--gold);background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;opacity:.4">${_lang==='en'?'Play →':'Jugar →'}</button>
       </div>
     </div>
     ${isSolo?`
     <div style="width:100%;max-width:340px;padding:16px 16px 20px;display:flex;flex-direction:column;align-items:center;gap:8px">
       <div style="width:100%;display:flex;align-items:center;gap:8px;margin-bottom:2px">
         <div style="flex:1;height:1px;background:rgba(201,168,76,.2)"></div>
-        <div style="font-family:Cinzel,serif;font-size:11px;color:var(--gold);letter-spacing:.1em;white-space:nowrap">🏆 RANKING DE RACHAS</div>
+        <div style="font-family:Cinzel,serif;font-size:11px;color:var(--gold);letter-spacing:.1em;white-space:nowrap">🏆 ${_lang==='en'?'STREAK RANKING':'RANKING DE RACHAS'}</div>
         <div style="flex:1;height:1px;background:rgba(201,168,76,.2)"></div>
       </div>
       <div id="BET_RANK_LIST" style="width:100%;display:flex;flex-direction:column;gap:4px">
-        <div style="text-align:center;color:rgba(232,220,200,.3);font-size:10px;padding:12px">Cargando ranking...</div>
+        <div style="text-align:center;color:rgba(232,220,200,.3);font-size:10px;padding:12px">${_lang==='en'?'Loading ranking...':'Cargando ranking...'}</div>
       </div>
       <div id="BET_RANK_PAGES" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;margin-top:2px"></div>
     </div>
@@ -2002,7 +2351,7 @@ function showBetScreen(){
           if(main)main.style.boxShadow='none';
         }
       });
-      ov.querySelector('#BET_INFO').textContent=`Apuesta: ${chip.v} ficha${chip.v>1?'s':''} por jugador`;
+      ov.querySelector('#BET_INFO').textContent=_lang==='en'?`Bet: ${chip.v} chip${chip.v>1?'s':''} per player`:`Apuesta: ${chip.v} ficha${chip.v>1?'s':''} por jugador`;
       ov.querySelector('#BET_INFO').style.color='var(--gold)';
       const ok=ov.querySelector('#BET_OK');
       ok.disabled=false;ok.style.opacity='1';
@@ -2035,9 +2384,9 @@ function diasEnTop(createdAt){
     const fecha=new Date(createdAt);
     const hoy=new Date();
     const diff=Math.floor((hoy-fecha)/(1000*60*60*24));
-    if(diff===0)return 'hoy';
-    if(diff===1)return '1 día';
-    return diff+' días';
+    if(diff===0)return t('rank_hoy');
+    if(diff===1)return t('rank_1dia');
+    return t('rank_dias',diff);
   }catch(e){return null;}
 }
 async function betRankLoad(ov,page){
@@ -2055,7 +2404,7 @@ async function betRankLoad(ov,page){
     const rows=await sbFetch(`/rest/v1/ranking?select=*&order=racha.desc,created_at.asc&limit=${perPage}&offset=${offset}`);
 
     if(!rows||!rows.length){
-      listEl.innerHTML='<div style="text-align:center;color:rgba(232,220,200,.3);font-size:10px;padding:16px 8px">Nadie en el ranking aún.<br>¡Sé el primero!</div>';
+      listEl.innerHTML=`<div style="text-align:center;color:rgba(232,220,200,.3);font-size:10px;padding:16px 8px">${t('rank_nobody').replace('\n','<br>')}</div>`;
       if(pagesEl)pagesEl.innerHTML='';
       return;
     }
@@ -2074,12 +2423,12 @@ async function betRankLoad(ov,page){
       const border=esYo?'rgba(74,158,232,.4)':isTop3?'rgba(201,168,76,.25)':'rgba(255,255,255,.06)';
       const nameColor=esYo?'#4A9EE8':isTop3?'var(--gold)':'rgba(232,220,200,.75)';
       const dias=isTop3?diasEnTop(r.created_at):null;
-      const diasHtml=dias?`<span style="color:rgba(255,200,60,.7);font-size:8px;font-style:italic"> · 👑 ${dias} en el top</span>`:'';
+      const diasHtml=dias?`<span style="color:rgba(255,200,60,.7);font-size:8px;font-style:italic"> · ${t('rank_days_top',dias)}</span>`:'';
       const paisBandera=`${r.bandera||'🌍'} ${r.pais||''}`.trim();
       html+=`<div style="display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:7px;border:1px solid ${border};background:${bg}">
         <span style="font-size:${isTop3?'16':'11'}px;min-width:20px;text-align:center">${medal}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-family:Cinzel,serif;font-size:10px;color:${nameColor};font-weight:${isTop3||esYo?700:400};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.nombre}${esYo?' ← tú':''}</div>
+          <div style="font-family:Cinzel,serif;font-size:10px;color:${nameColor};font-weight:${isTop3||esYo?700:400};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.nombre}${esYo?t('rank_you'):''}</div>
           <div style="display:flex;align-items:center;gap:4px;margin-top:1px;flex-wrap:nowrap;overflow:hidden">
             <span style="font-size:13px;line-height:1;flex-shrink:0">${r.bandera||'🌍'}</span>
             <span style="font-size:8px;color:rgba(232,220,200,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.pais||''}${r.fecha?` · ${r.fecha}`:''}${diasHtml}</span>
@@ -2087,7 +2436,7 @@ async function betRankLoad(ov,page){
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-family:Cinzel,serif;font-size:15px;color:${isTop3?'var(--gold)':'rgba(232,220,200,.6)'};font-weight:700">${r.racha}</div>
-          <div style="font-size:8px;color:rgba(232,220,200,.3)">seguidas</div>
+          <div style="font-size:8px;color:rgba(232,220,200,.3)">${t('rank_streak')}</div>
         </div>
       </div>`;
     });
@@ -2112,7 +2461,7 @@ async function betRankLoad(ov,page){
       }
     }
   }catch(e){
-    if(listEl)listEl.innerHTML=`<div style="text-align:center;color:rgba(226,75,74,.6);font-size:9px;padding:10px">Sin conexión al ranking</div>`;
+    if(listEl)listEl.innerHTML=`<div style="text-align:center;color:rgba(226,75,74,.6);font-size:9px;padding:10px">${_lang==='en'?'No connection to ranking':'Sin conexión al ranking'}</div>`;
   }
 }
 
@@ -2121,7 +2470,7 @@ async function showCuentas(){
   rmEl('CUE_OV');
   const ov=document.createElement('div');ov.id='CUE_OV';
   ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.92);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:400;padding:20px';
-  ov.innerHTML='<div style="color:var(--gold);font-family:Cinzel,serif;font-size:14px">💰 Cargando cuentas...</div>';
+  ov.innerHTML=`<div style="color:var(--gold);font-family:Cinzel,serif;font-size:14px">💰 ${_lang==='en'?'Loading accounts...':'Cargando cuentas...'}</div>`;
   $('G').appendChild(ov);
 
   const cuentasSalaId=MP.salaId||MP._lastSalaId||'';
@@ -2146,28 +2495,29 @@ async function showCuentas(){
       if(i===j)continue;
       const neto=(bankMatrix[j]&&bankMatrix[j][i]||0)-(bankMatrix[i]&&bankMatrix[i][j]||0);
       net+=neto;
-      if(neto>0)detalle.push(`${getName(j)} te debe ${neto}`);
-      else if(neto<0)detalle.push(`Debés ${-neto} a ${getName(j)}`);
+      if(neto>0)detalle.push(_lang==='en'?`${getName(j)} owes you ${neto}`:`${getName(j)} te debe ${neto}`);
+      else if(neto<0)detalle.push(_lang==='en'?`You owe ${-neto} to ${getName(j)}`:`Debés ${-neto} a ${getName(j)}`);
     }
     balances.push({name:getName(i),color:PCOLOR[i],net,detalle});
   }
 
-  let html=`<div style="font-family:Cinzel,serif;font-size:16px;color:var(--gold);letter-spacing:.08em">💰 Cuentas</div>`;
-  html+=`<div style="font-size:10px;color:rgba(232,220,200,.5);text-align:center">Balance acumulado entre partidas</div>`;
+  let html=`<div style="font-family:Cinzel,serif;font-size:16px;color:var(--gold);letter-spacing:.08em">💰 ${_lang==='en'?'Accounts':'Cuentas'}</div>`;
+  html+=`<div style="font-size:10px;color:rgba(232,220,200,.5);text-align:center">${_lang==='en'?'Accumulated balance between games':'Balance acumulado entre partidas'}</div>`;
   html+=`<table style="font-size:11px;width:100%;max-width:300px;border-collapse:collapse">`;
-  html+=`<tr><th style="font-family:Cinzel,serif;font-size:8px;color:var(--gold);padding:4px 6px;border-bottom:1px solid rgba(201,168,76,.2)">Jugador</th><th style="font-family:Cinzel,serif;font-size:8px;color:var(--gold);padding:4px 6px;border-bottom:1px solid rgba(201,168,76,.2)">Balance</th><th style="font-family:Cinzel,serif;font-size:8px;color:var(--gold);padding:4px 6px;border-bottom:1px solid rgba(201,168,76,.2)">Detalle</th></tr>`;
+  const thS='font-family:Cinzel,serif;font-size:8px;color:var(--gold);padding:4px 6px;border-bottom:1px solid rgba(201,168,76,.2)';
+  html+=`<tr><th style="${thS}">${_lang==='en'?'Player':'Jugador'}</th><th style="${thS}">Balance</th><th style="${thS}">${_lang==='en'?'Detail':'Detalle'}</th></tr>`;
   balances.forEach(b=>{
     const netColor=b.net>0?'#7be87b':b.net<0?'#E24B4A':'rgba(232,220,200,.5)';
-    const detalleHtml=b.detalle.map(d=>`<span style="color:${d.includes('te debe')?'#7be87b':'#E24B4A'}">${d}</span>`).join('<br>')||'—';
+    const detalleHtml=b.detalle.map(d=>`<span style="color:${(d.includes('te debe')||d.includes('owes you'))?'#7be87b':'#E24B4A'}">${d}</span>`).join('<br>')||'—';
     html+=`<tr><td style="padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.06);color:${b.color};font-weight:700">${b.name}</td>
       <td style="padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.06);color:${netColor};font-weight:700">${b.net>0?'+'+b.net:b.net}</td>
       <td style="padding:5px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:9px">${detalleHtml}</td></tr>`;
   });
   html+=`</table>`;
   html+=`<div style="display:flex;gap:8px;width:100%;max-width:280px;margin-top:4px;flex-wrap:wrap">
-    <button id="CUE_SHR" style="flex:2;padding:8px;border-radius:6px;border:1.5px solid #25D366;background:#25D36622;color:#25D366;font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">📤 Compartir</button>
-    ${MP.isHost||MP.mode!=='multi'?'<button id="CUE_RST" style="flex:1;padding:8px;border-radius:6px;border:1.5px solid rgba(226,75,74,.5);background:transparent;color:#E24B4A;font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">Resetear</button>':''}
-    <button id="CUE_CLO" style="flex:2;padding:8px;border-radius:6px;border:1.5px solid var(--gold);background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation">Cerrar</button>
+    <button id="CUE_SHR" style="flex:2;padding:8px;border-radius:6px;border:1.5px solid #25D366;background:#25D36622;color:#25D366;font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">📤 ${_lang==='en'?'Share':'Compartir'}</button>
+    ${MP.isHost||MP.mode!=='multi'?`<button id="CUE_RST" style="flex:1;padding:8px;border-radius:6px;border:1.5px solid rgba(226,75,74,.5);background:transparent;color:#E24B4A;font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation">${_lang==='en'?'Reset':'Resetear'}</button>`:''}
+    <button id="CUE_CLO" style="flex:2;padding:8px;border-radius:6px;border:1.5px solid var(--gold);background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation">${_lang==='en'?'Close':'Cerrar'}</button>
   </div>`;
 
   ov.innerHTML=html;
@@ -2208,13 +2558,14 @@ function shareCuentas(balances){
 
   // título
   ctx.fillStyle='#C9A84C';ctx.font='bold 36px Georgia,serif';
-  ctx.textAlign='center';ctx.fillText('💰 Cuentas — GOLPEADO',W/2,68);
+  ctx.textAlign='center';ctx.fillText(_lang==='en'?'💰 Accounts — GOLPEADO':'💰 Cuentas — GOLPEADO',W/2,68);
 
   // fecha y hora
   ctx.fillStyle='rgba(232,220,200,.6)';ctx.font='22px Georgia,serif';
   const now=new Date();
-  const fecha=now.toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'});
-  const hora=now.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+  const _loc=_lang==='en'?'en':'es';
+  const fecha=now.toLocaleDateString(_loc,{day:'2-digit',month:'long',year:'numeric'});
+  const hora=now.toLocaleTimeString(_loc,{hour:'2-digit',minute:'2-digit'});
   ctx.fillText(`${fecha} · ${hora}`,W/2,104);
 
   // línea separadora
@@ -2232,14 +2583,14 @@ function shareCuentas(balances){
     const netColor=b.net>0?'#7be87b':b.net<0?'#E24B4A':'rgba(232,220,200,.4)';
     ctx.fillStyle=netColor;ctx.font='bold 32px Georgia,serif';
     ctx.textAlign='right';
-    ctx.fillText((b.net>0?'+':'')+b.net+(b.net!==0?' fichas':''),W-48,y);
+    ctx.fillText((b.net>0?'+':'')+b.net+(b.net!==0?(_lang==='en'?' chips':' fichas'):''),W-48,y);
 
     // detalle
     if(b.detalle.length){
       ctx.fillStyle='rgba(232,220,200,.7)';ctx.font='20px Georgia,serif';
       ctx.textAlign='left';
       b.detalle.forEach((d,di)=>{
-        const col=d.includes('te debe')||d.includes('debe')?'#7be87b':'#E24B4A';
+        const col=(d.includes('te debe')||d.includes('owes you'))?'#7be87b':'#E24B4A';
         ctx.fillStyle=col;
         ctx.fillText(d, 48, y+32+(di*26));
       });
@@ -2254,7 +2605,7 @@ function shareCuentas(balances){
 
   // pie
   ctx.fillStyle='rgba(201,168,76,.5)';ctx.font='20px Georgia,serif';
-  ctx.textAlign='center';ctx.fillText('🃏 Juego GOLPEADO',W/2,H-22);
+  ctx.textAlign='center';ctx.fillText(_lang==='en'?'🃏 GOLPEADO Game':'🃏 Juego GOLPEADO',W/2,H-22);
 
   // Intentar Web Share con imagen (funciona en Android Chrome y Safari iOS 15+)
   // IMPORTANTE: en iOS el share debe iniciarse sincrónicamente desde el gesto
@@ -2266,8 +2617,8 @@ function shareCuentas(balances){
       // Intentar con archivo primero
       const shareWithFile=()=>{
         navigator.share({
-          title:'Cuentas GOLPEADO',
-          text:'Balance de nuestras partidas \uD83C\uDCCF',
+          title:_lang==='en'?'Accounts GOLPEADO':'Cuentas GOLPEADO',
+          text:_lang==='en'?'Balance from our games \uD83C\uDCCF':'Balance de nuestras partidas \uD83C\uDCCF',
           files:[file]
         }).catch(err=>{
           // Si falla compartir archivo (ej. iOS no soporta), intentar solo texto
@@ -2291,14 +2642,15 @@ function shareCuentas(balances){
 }
 
 function shareTextOnly(balances){
-  const texto='💰 Cuentas GOLPEADO\n'
-    +new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})+'\n\n'
+  const _loc=_lang==='en'?'en':'es';
+  const texto=(_lang==='en'?'💰 Accounts GOLPEADO':'💰 Cuentas GOLPEADO')+'\n'
+    +new Date().toLocaleDateString(_loc,{day:'2-digit',month:'long',year:'numeric'})+'\n\n'
     +balances.map(b=>
-      `${b.name}: ${b.net>0?'+':''}${b.net} fichas`
+      `${b.name}: ${b.net>0?'+':''}${b.net} ${_lang==='en'?'chips':'fichas'}`
       +(b.detalle.length?'\n'+b.detalle.join('\n'):'')
     ).join('\n\n')
-    +'\n\n🃏 Juego GOLPEADO';
-  navigator.share({title:'Cuentas GOLPEADO',text:texto})
+    +(_lang==='en'?'\n\n🃏 GOLPEADO Game':'\n\n🃏 Juego GOLPEADO');
+  navigator.share({title:_lang==='en'?'Accounts GOLPEADO':'Cuentas GOLPEADO',text:texto})
     .catch(()=>{});
 }
 
@@ -2369,6 +2721,7 @@ function calcPayments(winners,adj,tie,gp,gWon){
 function startGame(){
   UID=0;
   clearRevTimer();
+  _applyLangStatic();
   if(_verResCountdown){clearInterval(_verResCountdown);_verResCountdown=null;}
   undoClear();
   clearTurnReminder();
@@ -2381,12 +2734,12 @@ function startGame(){
 function showShufOv(){
   rmEl('SHUF');rmEl('CUE_OV');rmEl('HTP_OV');
   const ov=mkEl('div','shov','SHUF');
-  ov.innerHTML=`<p class="smsg">Barajando las cartas...</p><div class="shdeck" id="SDK"><div class="sc" style="top:7px;left:17px"></div><div class="sc" style="top:3px;left:17px"></div><div class="sc" style="top:0;left:17px"></div></div><p class="ssub">aguarda...</p>`;
+  ov.innerHTML=`<p class="smsg">${t('msg_shuffling')}</p><div class="shdeck" id="SDK"><div class="sc" style="top:7px;left:17px"></div><div class="sc" style="top:3px;left:17px"></div><div class="sc" style="top:0;left:17px"></div></div><p class="ssub">${_lang==='en'?'wait...':'aguarda...'}</p>`;
   $('G').appendChild(ov);
   const rawDeck=shuf(makeDeck());
   let n=0;const cards=ov.querySelectorAll('.sc');
   function step(){
-    if(n>=5){ov.querySelector('.smsg').textContent='¡Listo! Corta el mazo.';ov.querySelector('.ssub').textContent='';const btn=document.createElement('button');btn.className='cbtn';btn.textContent='✂ Cortar el mazo';btn.onclick=()=>doCut(ov,rawDeck);btn.addEventListener('touchend',e=>{e.preventDefault();doCut(ov,rawDeck);},{passive:false});ov.appendChild(btn);const sdk=ov.querySelector('#SDK');if(sdk){sdk.style.cursor='pointer';sdk.onclick=()=>doCut(ov,rawDeck);sdk.addEventListener('touchend',e=>{e.preventDefault();doCut(ov,rawDeck);},{passive:false});}return;}
+    if(n>=5){ov.querySelector('.smsg').textContent=_lang==='en'?'Ready! Cut the deck.':'¡Listo! Corta el mazo.';ov.querySelector('.ssub').textContent='';const btn=document.createElement('button');btn.className='cbtn';btn.textContent=_lang==='en'?'✂ Cut the deck':'✂ Cortar el mazo';btn.onclick=()=>doCut(ov,rawDeck);btn.addEventListener('touchend',e=>{e.preventDefault();doCut(ov,rawDeck);},{passive:false});ov.appendChild(btn);const sdk=ov.querySelector('#SDK');if(sdk){sdk.style.cursor='pointer';sdk.onclick=()=>doCut(ov,rawDeck);sdk.addEventListener('touchend',e=>{e.preventDefault();doCut(ov,rawDeck);},{passive:false});}return;}
     cards[0].classList.add('sa1');cards[2].classList.add('sa2');
     sndShuffle(); // sonido de barajado
     setTimeout(()=>{cards[0].classList.remove('sa1');cards[2].classList.remove('sa2');n++;setTimeout(step,130);},500);
@@ -2401,7 +2754,7 @@ function doCut(ov,rawDeck){
   cs[0].style.transition='transform .4s';cs[0].style.transform='translateY(-28px)';
   cs[1].style.transition='transform .4s';cs[1].style.transform='translateY(-16px)';
   const half=Math.floor(rawDeck.length/2);
-  setTimeout(()=>{ov.querySelector('.smsg').textContent='¡Repartiendo!';setTimeout(()=>{ov.remove();dealCards(rawDeck.slice(0,half),rawDeck.slice(half));},500);},600);
+  setTimeout(()=>{ov.querySelector('.smsg').textContent=_lang==='en'?'Dealing!':'¡Repartiendo!';setTimeout(()=>{ov.remove();dealCards(rawDeck.slice(0,half),rawDeck.slice(half));},500);},600);
 }
 function dealCards(poolA,poolB){
   S.phase='deal';S.deck=shuf([...poolB]);S.disc=[];
@@ -2423,7 +2776,7 @@ function dealCards(poolA,poolB){
       deck:S.deck,disc:[],hands:Array.from({length:S.np},()=>[]),
       shown:Array.from({length:S.np},()=>[]),
       sel:[],cur:0,phase:'dealing',dealSeq:seq,
-      over:false,golpBy:-1,msg:'Repartiendo...',comboThisTurn:false,
+      over:false,golpBy:-1,msg:t('msg_dealing'),comboThisTurn:false,
       _revOrd:null,_revIdx:0,_revPid:-1,_revSel:[],_fitTarget:null,_fitCandidates:null,ts:Date.now()
     };
     sbSet(MP.salaId,dealState).then(()=>{
@@ -2433,21 +2786,21 @@ function dealCards(poolA,poolB){
       S.deck=dealState.deck;S.disc=[];BET=dealState.apuesta;
       animateDeal(seq,()=>{
         S.phase='first_discard';
-        S.msg='Primer turno: seleccioná 1 carta para descartar y comenzar.';
+        S.msg=t('msg_first_turn');
         redraw();mpPublicarEstado();
       });
     }).catch(e=>showError('Error: '+e.message));
   } else {
     animateDeal(seq,()=>{
       S.phase='first_discard';
-      S.msg='Primer turno: seleccioná 1 carta para descartar y comenzar.';
+      S.msg=t('msg_first_turn');
       redraw();
     });
   }
 }
 
 function animateDeal(seq,onDone){
-  S.msg='Repartiendo...';redraw();
+  S.msg=t('msg_dealing');redraw();
   const dkEl=$('DK');
   if(!dkEl){if(onDone)onDone();return;}
   const dkR=dkEl.getBoundingClientRect();
@@ -2497,14 +2850,14 @@ function sortHand(){
       const sd=(suitOrder[a.s]||0)-(suitOrder[b.s]||0);
       return sd!==0?sd:val(a)-val(b);
     });
-    S.msg='Mano ordenada por palo.';
+    S.msg=t('msg_sorted_suit');
   } else if(_sortMode===2){
     // Modo 2: por número luego palo
     h.sort((a,b)=>{
       const nd=val(a)-val(b);
       return nd!==0?nd:(suitOrder[a.s]||0)-(suitOrder[b.s]||0);
     });
-    S.msg='Mano ordenada por número.';
+    S.msg=t('msg_sorted_num');
   } else {
     // Modo 0: intentar agrupar combos posibles primero
     // separar cartas que forman combos de las que no
@@ -2518,7 +2871,7 @@ function sortHand(){
     }
     const rest=h.filter((_,i)=>!used.has(i)).sort((a,b)=>val(a)-val(b));
     S.hands[0]=[...groups.flat(),...rest];
-    S.msg='Mano ordenada: combos primero.';
+    S.msg=t('msg_sorted_combo');
   }
   sndSelect();
   drawHand();drawMsg();
@@ -2710,7 +3063,7 @@ function actGolpe(){
 
 // Refill mazo con cartas descartadas + animación de barajado
 function refillDeck(callback){
-  S.msg='¡Mazo vacío! Barajando las cartas descartadas...';
+  S.msg=t('msg_empty_deck');
   redraw();
   sndShuffle();
 
@@ -2719,7 +3072,7 @@ function refillDeck(callback){
   const shuf=document.createElement('div');
   shuf.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.55);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:400;pointer-events:none';
   shuf.innerHTML=`
-    <div style="font-family:Cinzel,serif;font-size:14px;color:rgba(232,220,200,.9);letter-spacing:.05em">Barajando descarte...</div>
+    <div style="font-family:Cinzel,serif;font-size:14px;color:rgba(232,220,200,.9);letter-spacing:.05em">${t('msg_shuffling_disc')}</div>
     <div style="position:relative;width:70px;height:90px">
       <div class="sc" style="top:6px;left:12px"></div>
       <div class="sc" style="top:2px;left:12px;animation:sa1 .5s ease-in-out infinite"></div>
@@ -2734,7 +3087,7 @@ function refillDeck(callback){
     S.disc=[];
     // barajar
     for(let i=S.deck.length-1;i>0;i--){const j=0|Math.random()*(i+1);[S.deck[i],S.deck[j]]=[S.deck[j],S.deck[i]];}
-    S.msg=miNom()+': Mazo rearmado. Podés tomar del mazo.';
+    S.msg=t('msg_deck_rebuilt',miNom());
     redraw();
     if(callback)setTimeout(callback,300);
   },1200);
@@ -2745,7 +3098,7 @@ function actDraw(){
   // No cancelar el reminder aquí — el turno no terminó todavía
   if(!S.deck.length){
     // mazo vacío → refill con descarte y barajar
-    if(!S.disc.length){S.msg='¡No quedan cartas!';drawMsg();return;}
+    if(!S.disc.length){S.msg=t('msg_no_cards');drawMsg();return;}
     refillDeck(()=>actDraw());
     return;
   }
@@ -2753,12 +3106,12 @@ function actDraw(){
   sndDraw();
   clrSel();S.comboThisTurn=false;S.phase='drew';
   mpPublicarEstado();
-  S.msg=miNom()+': Tomaste una carta. Mostrá combo o seleccioná 1 carta para descartar.';
+  S.msg=t('msg_took_card',miNom());
   startTurnReminder();
   redraw();
   // Mensaje temporal sobre la mano — ahora sí pueden seleccionar
   const nomDraw=MP.mode==='multi'?(MP.myName||'Jugador'):'Jugador';
-  showHandGuide('Podés armar un combo u ordenar tus naipes, pero principalmente seleccioná la carta que no necesites y presioná Descartar para continuar con el juego','rgba(74,158,232,.9)',false,0);
+  showHandGuide(_lang==='en'?'You can form a combo or sort your cards, but mainly select the card you don\'t need and press Discard to continue':'Podés armar un combo u ordenar tus naipes, pero principalmente seleccioná la carta que no necesites y presioná Descartar para continuar con el juego','rgba(74,158,232,.9)',false,0);
 }
 
 function actTakeDisc(){
@@ -2771,7 +3124,7 @@ function actTakeDisc(){
     for(let j=i+1;j<hand.length;j++)
       if(validCombo([hand[i],hand[j],top])){canForm=true;break outer;}
   if(!canForm){
-    S.msg=miNom()+': No podés formar combo con esa carta. Tomá del mazo.';
+    S.msg=t('msg_sel3',miNom());
     drawMsg();drawActs();return;
   }
   S.disc.pop(); sndDraw();
@@ -2805,20 +3158,20 @@ function actShowCombo(){
   const cs=S._discTaken?[S._discTaken,...selBase]:selBase;
   const minCartas=S._discTaken?2:3; // con discTaken necesita 2 de la mano (total 3)
   if(selBase.length<minCartas){
-    S.msg=miNom()+': Seleccioná al menos '+minCartas+' cartas de tu mano para el combo.';
+    S.msg=t('msg_sel_min',miNom(),minCartas);
     drawMsg();drawActs();return;
   }
-  if(cs.length<3){S.msg=miNom()+': Seleccioná al menos 3 cartas.';drawMsg();drawActs();return;}
-  if(!validCombo(cs)){S.msg='No forman grupo ni escalera válida.';drawMsg();drawActs();return;}
+  if(cs.length<3){S.msg=t('msg_sel3',miNom());drawMsg();drawActs();return;}
+  if(!validCombo(cs)){S.msg=t('msg_invalid');drawMsg();drawActs();return;}
   const ids=selBase.map(c=>c.id);
   const _c0={cards:[...cs],type:comboType(cs)};_c0.order=sortCombo(_c0);S.shown[0].push(_c0);
   S.hands[0]=rmIds(S.hands[0],ids);
   S._discTaken=null; // carta del descarte ya fue usada en el combo
   sndCombo();clrSel();S.comboThisTurn=true;S.phase="showed_combo";mpPublicarEstado();
-  S.msg=miNom()+': ¡Combo mostrado! Ahora seleccioná 1 carta que no necesites y presioná Descartar.';
+  S.msg=t('msg_showed',miNom());
   startTurnReminder();
   redraw();
-  showHandGuide('¡Combo en mesa! Ahora seleccioná 1 carta que no necesites y presioná Descartar','rgba(123,232,123,.85)',false,0);
+  showHandGuide(_lang==='en'?'Combo on the table! Now select 1 card you don\'t need and press Discard':'¡Combo en mesa! Ahora seleccioná 1 carta que no necesites y presioná Descartar','rgba(123,232,123,.85)',false,0);
 }
 
 function actDevolverDisc(){
@@ -2830,8 +3183,8 @@ function actDevolverDisc(){
   S._discTaken=null;
   S.phase='play'; // volver al estado normal — puede elegir mazo o descarte
   clrSel();
-  S.msg=miNom()+': Carta devuelta. Podés tomar del mazo o del descarte.';
-  showHandGuide(miNom()+': Podés tomar del mazo o del nuevo descarte','rgba(201,168,76,.7)',false,0);
+  S.msg=t('msg_returned',miNom());
+  showHandGuide(miNom()+(_lang==='en'?': You can draw from the deck or take the new discard':': Podés tomar del mazo o del nuevo descarte'),'rgba(201,168,76,.7)',false,0);
   startTurnReminder();
   redraw();
   if(MP.mode==='multi')mpPublicarEstado();
@@ -2839,7 +3192,7 @@ function actDevolverDisc(){
 
 function actDiscard(){
   const cs=selCards();
-  if(cs.length!==1){S.msg=miNom()+': Seleccioná 1 carta para descartar.';drawMsg();drawActs();return;}
+  if(cs.length!==1){S.msg=t('msg_sel_discard',miNom());drawMsg();drawActs();return;}
   const card=cs[0];
   S.hands[0]=rmIds(S.hands[0],[card.id]);
   // Al descartar, limpiar _owner y _fittedBy para que no se cuente como del jugador
@@ -2880,14 +3233,21 @@ let _turnReminderMsg=''; // mensaje activo del recordatorio — persiste entre r
 const TURN_REMINDER_SEC=20;
 
 function getTurnReminderMsg(){
-  const nombre=MP.mode==='multi'?(MP.myName||'Jugador'):'';
+  const nombre=MP.mode==='multi'?(MP.myName||(_lang==='en'?'Player':'Jugador')):'';
   const n=nombre?nombre+', ':'';
-  const msgs=[
-    `😅 ¡Ey, ${n.trim()||'jugador'}! Es tu turno, no te quedés dormido...`,
+  const p=n.trim()||(_lang==='en'?'player':'jugador');
+  const msgs=_lang==='en'?[
+    `😅 Hey, ${p}! It's your turn, don't fall asleep...`,
+    `👀 ${n}we're waiting! Are you playing or not?`,
+    `⏰ ${n}come on! The others are waiting for your move.`,
+    `🤔 ${n}still there? It's your turn!`,
+    `😬 Psst, ${p}... it's your turn! Don't get distracted.`,
+  ]:[
+    `😅 ¡Ey, ${p}! Es tu turno, no te quedés dormido...`,
     `👀 ${n}¡te estamos esperando! ¿Jugás o no?`,
     `⏰ ${n}¡dale! Los demás están esperando tu jugada.`,
     `🤔 ${n}¿seguís ahí? ¡Tu turno te llama!`,
-    `😬 Psst, ${n.trim()||'jugador'}... ¡es tu turno! No te distraigas.`,
+    `😬 Psst, ${p}... ¡es tu turno! No te distraigas.`,
   ];
   return msgs[Math.floor(Math.random()*msgs.length)];
 }
@@ -2922,16 +3282,16 @@ function passTurn(){
     S.phase='play';
     const miNombreM=MP.myName||'Tú';
     S.msg=esMiTurno
-      ?`${miNombreM}: ¡GOLPEADO! · tomar descarte · tomar del mazo.`
-      :`Turno de ${PNAME(S.cur)}...`;
+      ?t('msg_your_turn')
+      :(_lang==='en'?`${PNAME(S.cur)}'s turn...`:`Turno de ${PNAME(S.cur)}...`);
     if(esMiTurno){notificarMiTurno();startTurnReminder();}
     else clearTurnReminder();
     mpPublicarEstado();
     redraw();
   } else {
     // modo bots: usar "Tu turno" genérico
-    if(S.cur===0){S.phase='play';S.msg='Tu turno: ¡GOLPEADO! · tomar descarte · tomar del mazo.';startTurnReminder();redraw();}
-    else{clearTurnReminder();S.phase='bot';S.msg=`Bot ${S.cur} piensa...`;redraw();setTimeout(()=>botTurn(S.cur),850);}
+    if(S.cur===0){S.phase='play';S.msg=t('msg_your_turn');startTurnReminder();redraw();}
+    else{clearTurnReminder();S.phase='bot';S.msg=t('msg_bot_thinking',S.cur);redraw();setTimeout(()=>botTurn(S.cur),850);}
   }
 }
 
@@ -2963,7 +3323,7 @@ function botTurn(pid){
     // Solo golpear si claramente voy ganando O tengo ≤3 cartas
     if(h.length<=3||ptsPropios<minOponente-3){
       S.golpBy=pid;
-      showGolpeAnimation(`${PNAME(pid)} declaró GOLPEADO`,()=>startReveal());
+      showGolpeAnimation(_lang==='en'?`${PNAME(pid)} declared GOLPEADO`:`${PNAME(pid)} declaró GOLPEADO`,()=>startReveal());
       return;
     }
   }
@@ -2983,7 +3343,7 @@ function botTurn(pid){
         S.hands[pid]=rmIds(S.hands[pid],[a.id,b.id]);
         const _ct={cards:[a,b,top],type:comboType([a,b,top])};
         _ct.order=sortCombo(_ct);S.shown[pid].push(_ct);
-        S.msg=`${PNAME(pid)} tomó el descarte y mostró combo.`;
+        S.msg=t('msg_bot_took_disc',PNAME(pid));
         botBajarCombos(pid);
         botEncajarEnMesa(pid);
         botDiscard(pid);return;
@@ -2997,7 +3357,7 @@ function botTurn(pid){
         S.disc.pop();S.hands[pid].push(top);
         delete peor._owner;delete peor._fittedBy;
   S.disc.push(peor);S.hands[pid]=rmIds(S.hands[pid],[peor.id]);
-        S.msg=`${PNAME(pid)} intercambió cartas.`;
+        S.msg=t('msg_bot_swap',PNAME(pid));
         passTurn();return;
       }
     }
@@ -3007,7 +3367,7 @@ function botTurn(pid){
   if(!S.deck.length&&S.disc.length){
     S.deck=[...S.disc];S.disc=[];
     shuf(S.deck);
-    S.msg=`¡Mazo rearmado!`;
+    S.msg=t('msg_deck_ok');
   }
   if(S.deck.length){const _c=S.deck.pop();_c._owner=pid;S.hands[pid].push(_c);}
 
@@ -3108,7 +3468,7 @@ function botDiscard(pid){
     const wl=h.find(c=>c.wl);
     const drop=jk||wl; // preferir descartar Joker (más común)
     S.disc.push(drop);S.hands[pid]=rmIds(S.hands[pid],[drop.id]);
-    S.msg=`${PNAME(pid)} descartó un comodín.`;passTurn();return;
+    S.msg=t('msg_wild_discard',PNAME(pid));passTurn();return;
   }
 
   // Descartar la carta más "inútil":
@@ -3134,7 +3494,7 @@ function botDiscard(pid){
   scored.sort((a,b)=>a.score-b.score||b.val-a.val);
   const drop=scored[0].card;
   S.disc.push(drop);S.hands[pid]=rmIds(S.hands[pid],[drop.id]);
-  if(!S.msg.includes('mostró')&&!S.msg.includes('encajó'))S.msg=`${PNAME(pid)} descartó.`;
+  if(!S.msg.includes('mostró')&&!S.msg.includes('encajó')&&!S.msg.includes('shown')&&!S.msg.includes('fitted'))S.msg=t('msg_bot_discarded',PNAME(pid));
   passTurn();
 }
 
@@ -3155,11 +3515,11 @@ function startReveal(){
   for(let i=1;i<S.np;i++)S._revOrd.push((gp+i)%S.np);
   S._revOrd.push(gp);
   S._revIdx=0;S._revPid=-1;S._revSel=new Set();
-  S.msg='¡GOLPEADO declarado por '+PNAME(gp)+'! Mostrando juegos...';
+  S.msg=t('msg_golpe',PNAME(gp));
   redraw();
   if(MP.mode==='multi'){
     mpPublicarEstadoConFase('golpeado_reveal');
-    showGolpeAnimation('¡'+PNAME(0)+' declaró GOLPEADO!',()=>{
+    showGolpeAnimation(_lang==='en'?PNAME(0)+' declared GOLPEADO!':'¡'+PNAME(0)+' declaró GOLPEADO!',()=>{
       // esperar un momento después de la animación antes de mostrar cartas
       setTimeout(()=>revealNext(),600);
     });
@@ -3173,7 +3533,7 @@ function revealNext(){
   if(S._revIdx>=S._revOrd.length){
     clearRevTimer(); // limpiar timer al terminar revelación
     S.phase='mesa_final';S._revPid=-1;
-    S.msg='¡Todos mostraron su juego! Presioná Ver resultados.';
+    S.msg=t('msg_all_shown');
     // En multi: iniciar countdown de 10s antes de habilitar Ver Resultados
     if(MP.mode==='multi'){
       S._verResSegs=10;
@@ -3245,12 +3605,12 @@ function revealNext(){
 
   if(MP.mode==='multi'){
     if(pid===0){
-      S.msg='Tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.';
+      S.msg=t('msg_your_reveal');
       redraw();
       mpPublicarEstado();
       startRevTimer(); // arrancar temporizador solo para el jugador activo
     } else {
-      S.msg=PNAME(pid)+' está mostrando su juego...';
+      S.msg=t('msg_other_reveal',PNAME(pid));
       clearRevTimer();
       redraw();
       mpPublicarEstado();
@@ -3259,10 +3619,10 @@ function revealNext(){
     if(pid!==0){
       botShowOne(pid);autoFit(pid);
       const pts=S.hands[pid].reduce((a,c)=>a+cv(c),0);
-      S.msg=PNAME(pid)+' mostró su juego — sobrantes: '+pts+' pts.';
+      S.msg=t('msg_other_showed',PNAME(pid),pts);
       S._revIdx++;redraw();setTimeout(revealNext,1400);
     } else {
-      S.msg='Tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.';
+      S.msg=t('msg_your_reveal');
       redraw();
       startRevTimer(); // arrancar temporizador en modo solo también
     }
@@ -3274,7 +3634,7 @@ function doListo(){
   const pts=S.hands[0].reduce((a,c)=>a+cv(c),0);
   const miNombre=MP.mode==='multi'?(MP.myName||'Tú'):'Tú';
   S._revSel=new Set();S._revIdx++;S._revPid=-1;
-  S.msg=pts===0?'¡'+miNombre+' sin sobrantes! Esperando...':miNombre+': '+pts+' pts sobrantes.';
+  S.msg=pts===0?t('msg_no_leftover',miNombre):t('msg_my_leftover',miNombre,pts);
   redraw();
   if(MP.mode==='multi'){
     // revealNext() ya llama mpPublicarEstado() internamente
@@ -3367,7 +3727,7 @@ function undoPop(){
   S._revSel=new Set();
   S._fitTarget=null;
   S._fitCandidates=null;
-  S.msg='↩ Acción deshecha.';
+  S.msg=t('msg_undo');
   if(MP.mode==='multi')mpPublicarEstado();
   redraw();
   return true;
@@ -3377,15 +3737,15 @@ function undoClear(){_undoStack=[];}
 
 function revealBajar(){
   const sel=S.hands[0].filter(c=>S._revSel.has(c.id));
-  if(sel.length<3){S.msg='Seleccioná mín. 3 cartas para bajar un combo.';redraw();return;}
-  if(!validCombo(sel)){S.msg='Esas cartas no forman grupo ni escalera válida.';redraw();return;}
+  if(sel.length<3){S.msg=t('msg_sel3',miNom());redraw();return;}
+  if(!validCombo(sel)){S.msg=t('msg_invalid');redraw();return;}
   // Cancelar auto-listo — el jugador hizo algo más
   if(_autoListoTimer){clearTimeout(_autoListoTimer);_autoListoTimer=null;S._autoListoSegs=undefined;}
   undoPush(); // guardar estado antes de bajar
   const _cs={cards:[...sel],type:comboType(sel)};_cs.order=sortCombo(_cs);S.shown[0].push(_cs);
   S.hands[0]=rmIds(S.hands[0],sel.map(c=>c.id));
   S._revSel=new Set();S._fitTarget=null;S._fitCandidates=null;
-  sndCombo();S.msg=`¡Combo bajado! (${comboType(sel)}) — seguí o presioná Listo.`;
+  sndCombo();S.msg=t('msg_combo_shown',comboType(sel));
   if(MP.mode==='multi')mpPublicarEstado();
   redraw();
 }
@@ -3396,7 +3756,7 @@ function revealBajar(){
 // 3. Si hay solo 1 → encaja directo
 function revealEncajar(){
   const sel=S.hands[0].filter(c=>S._revSel.has(c.id));
-  if(!sel.length){S.msg='Seleccioná al menos 1 carta para encajar.';redraw();return;}
+  if(!sel.length){S.msg=t('msg_sel_fit');redraw();return;}
 
   const all=S.shown.flat();
   let anyFit=false;
@@ -3414,7 +3774,7 @@ function revealEncajar(){
       S._fitTarget=card.id;
       S._fitCandidates=new Set(fits);
       S._revSel=new Set([card.id]); // mantener solo esta seleccionada
-      S.msg='Toca el combo destino donde querés encajar la carta (resaltados en amarillo).';
+      S.msg=t('msg_tap_combo');
       anyFit=true;
     }
   });
@@ -3428,8 +3788,8 @@ function revealEncajar(){
       return validCombo([...combo.cards,...sel]);
     });
     S.msg=hayJokerReordenable
-      ?'Primero mové el Joker dentro del combo (arrastralo) para hacer lugar.'
-      :'Esa carta no encaja en ningún combo de la mesa.';
+      ?(_lang==='en'?'First move the Joker within the combo (drag it) to make room.':'Primero mové el Joker dentro del combo (arrastralo) para hacer lugar.')
+      :(_lang==='en'?'That card does not fit any combo on the table.':'Esa carta no encaja en ningún combo de la mesa.');
   }
   if(MP.mode==='multi')mpPublicarEstado();
   redraw();
@@ -3510,7 +3870,7 @@ function doFitCard(card,combo){
     const newOrd=[card,...ordActual.filter(c=>!c.jk)];
     combo.cards.push(card);
     combo.order=newOrd;
-    S.msg='¡Joker encajado al inicio! Si preferís que vaya al final, arrastralo.';
+    S.msg=_lang==='en'?'Joker fitted at start! If you prefer it at the end, drag it.':'¡Joker encajado al inicio! Si preferís que vaya al final, arrastralo.';
     // Marcar este combo para que el drag del Joker funcione aunque sea combo ajeno
     combo._jokerOwner=0; // slot del jugador que encajó el Joker
   } else {
@@ -3525,7 +3885,7 @@ function fitToCombo(comboRef){
   const card=S.hands[0].find(c=>c.id===S._fitTarget);
   if(!card){S._fitTarget=null;S._fitCandidates=null;redraw();return;}
   if(!canFit(comboRef.cards,card,comboRef)){
-    S.msg='Ese combo no acepta esta carta.';
+    S.msg=t('msg_fit_invalid');
     S._fitTarget=null;S._fitCandidates=null;redraw();return;
   }
   doFitCard(card,comboRef);
@@ -3834,7 +4194,7 @@ function drawBots(){
       ct.style.cssText='font-size:10px;color:rgba(201,168,76,.75);font-family:Cinzel,serif;align-self:center;margin-left:4px;font-weight:700';
       ct.textContent=`×${S.hands[i].length}`;bc.appendChild(ct);
       d.appendChild(bc);
-      d.appendChild(Object.assign(document.createElement('div'),{className:'binfo',textContent:'en mano'}));
+      d.appendChild(Object.assign(document.createElement('div'),{className:'binfo',textContent:_lang==='en'?'in hand':'en mano'}));
     }
     BR.appendChild(d);
   }
@@ -4121,7 +4481,9 @@ function drawHand(){
   if(S.phase==='play'&&S.cur===0&&!S.over){
     const nom=MP.mode==='multi'?(MP.myName||'Jugador'):'Jugador';
     showHandGuide(
-      nom+': primero tomá una carta del mazo, tomá el descarte si corresponde, o golpeá si estás seguro',
+      _lang==='en'
+        ?(nom+': draw from the deck, take the discard if it helps, or declare GOLPEADO if you\'re sure')
+        :(nom+': primero tomá una carta del mazo, tomá el descarte si corresponde, o golpeá si estás seguro'),
       'rgba(201,168,76,.7)',
       false,
       0
@@ -4198,32 +4560,32 @@ function drawHUD(){
 
   if(S.phase==='golpeado_reveal'){
     if(S._revPid===0){
-      turnoNombre='MOSTRANDO';turnoColor='var(--gold)';fontSize='10px';
+      turnoNombre=_lang==='en'?'SHOWING':'MOSTRANDO';turnoColor='var(--gold)';fontSize='10px';
     } else if(S._revPid>0){
       turnoNombre=PNAME(S._revPid);turnoColor=PCOLOR[S._revPid]||'rgba(201,168,76,.5)';fontSize='10px';
     } else {
       turnoNombre='GOLPEADO';turnoColor='#E24B4A';fontSize='10px';
     }
   } else if(S.phase==='mesa_final'){
-    turnoNombre='MESA';turnoColor='rgba(201,168,76,.5)';fontSize='10px';
+    turnoNombre=_lang==='en'?'TABLE':'MESA';turnoColor='rgba(201,168,76,.5)';fontSize='10px';
   } else {
     const esMiTurno=S.cur===0&&!S.over;
-    turnoNombre=esMiTurno?'TÚ':PNAME(S.cur);
+    turnoNombre=esMiTurno?(_lang==='en'?'YOU':'TÚ'):PNAME(S.cur);
     turnoColor=esMiTurno?'var(--gold)':(PCOLOR[S.cur]||'rgba(201,168,76,.3)');
     fontSize=esMiTurno?'14px':'10px';
   }
 
   const chipHtml=BET>0?'<div style="display:flex;flex-direction:column;align-items:center;gap:1px" id="HUD_CHIP"></div>':'';
   $('HUD').innerHTML=
-    '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv">'+S.hands[0].length+'</span><span>en mano</span></div>'+
-    '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv">'+S.deck.length+'</span><span>mazo</span></div>'+
-    '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv">'+S.shown[0].length+'</span><span>combos</span></div>'+
+    '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv">'+S.hands[0].length+'</span><span>'+(_lang==='en'?'hand':'en mano')+'</span></div>'+
+    '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv">'+S.deck.length+'</span><span>'+(_lang==='en'?'deck':'mazo')+'</span></div>'+
+    '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv">'+S.shown[0].length+'</span><span>'+(_lang==='en'?'combos':'combos')+'</span></div>'+
     chipHtml+
-    '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv" style="color:'+turnoColor+';font-size:'+fontSize+'">'+turnoNombre+'</span><span>turno</span></div>'+
+    '<div style="display:flex;flex-direction:column;align-items:center"><span class="hv" style="color:'+turnoColor+';font-size:'+fontSize+'">'+turnoNombre+'</span><span>'+(_lang==='en'?'turn':'turno')+'</span></div>'+
     '';
   if(BET>0){
     const slot=$('HUD_CHIP');
-    if(slot){slot.appendChild(mkChip(BET,26));const lbl=document.createElement('span');lbl.style.cssText='font-size:8px;color:rgba(232,220,200,.5)';lbl.textContent='apuesta';slot.appendChild(lbl);}
+    if(slot){slot.appendChild(mkChip(BET,26));const lbl=document.createElement('span');lbl.style.cssText='font-size:8px;color:rgba(232,220,200,.5)';lbl.textContent=_lang==='en'?'bet':'apuesta';slot.appendChild(lbl);}
   }
 }
 
@@ -4292,11 +4654,11 @@ function drawActs(){
       const adj=scores.map((s,i)=>s+(usedBothWilds(i)?60:0));
       summary=S.hands.map((h,i)=>'<span style="color:'+PCOLOR[i]+';font-weight:700">'+PNAME(i)+': '+adj[i]+'pts</span>').join(' &nbsp;·&nbsp; ');
       const pens=detectPenalties();
-      if(pens.length){penHtml=pens.map(p=>'<div style="background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.35);border-radius:6px;padding:5px 10px;font-size:9px;text-align:center;width:100%">⚠️ <span style="color:'+p.color+';font-weight:700">'+p.name+'</span> <span style="color:rgba(232,220,200,.8)"> paga el <strong style="color:#E24B4A">doble</strong> — '+p.reason+'</span></div>').join('');}
+      if(pens.length){penHtml=pens.map(p=>'<div style="background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.35);border-radius:6px;padding:5px 10px;font-size:9px;text-align:center;width:100%">⚠️ <span style="color:'+p.color+';font-weight:700">'+p.name+'</span> <span style="color:rgba(232,220,200,.8)"> '+(_lang==='en'?'pays <strong style="color:#E24B4A">double</strong>':'paga el <strong style="color:#E24B4A">doble</strong>')+' — '+p.reason+'</span></div>').join('');}
     }catch(e){console.log('drawActs error:',e);}
     const segsRestantes=S._verResSegs||0;
     const btnDisabled=MP.mode==='multi'&&segsRestantes>0;
-    const btnLabel=btnDisabled?`⏳ Ver resultados (${segsRestantes}s)`:'Ver resultados finales →';
+    const btnLabel=btnDisabled?t('act_results_wait',segsRestantes):t('act_results');
     const btnStyle=btnDisabled
       ?'width:100%;font-size:11px;padding:8px;opacity:0.45;cursor:not-allowed'
       :'width:100%;font-size:11px;padding:8px';
@@ -4329,9 +4691,9 @@ function drawActs(){
       const hayUndo=_undoStack.length>0;
       const undoStyle=`flex:0 0 auto;padding:8px 6px;border-radius:7px;font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation;text-align:center;border:1.5px solid ${hayUndo?'rgba(226,75,74,.6)':'rgba(226,75,74,.2)'};background:transparent;color:${hayUndo?'rgba(226,75,74,.9)':'rgba(226,75,74,.25)'};transition:all .2s`;
       h+=`<div style="display:flex;gap:6px;width:100%">`;
-      h+=`<button onclick="revealBajar()" style="${bajarStyle}">⬇ Bajar combo</button>`;
-      h+=`<button onclick="revealEncajar()" style="${encajarStyle}">🔗 Encajar</button>`;
-      h+=`<button onclick="undoPop()" style="${undoStyle}" ${hayUndo?'':'disabled'} title="Deshacer última acción">↩</button>`;
+      h+=`<button onclick="revealBajar()" style="${bajarStyle}">${t('act_show_dn')}</button>`;
+      h+=`<button onclick="revealEncajar()" style="${encajarStyle}">${t('act_fit')}</button>`;
+      h+=`<button onclick="undoPop()" style="${undoStyle}" ${hayUndo?'':'disabled'} title="${_lang==='en'?'Undo last action':'Deshacer última acción'}">${t('act_undo')}</button>`;
       h+=`</div>`;
     }
 
@@ -4340,15 +4702,15 @@ function drawActs(){
     const esUltimo=S._revIdx>=S._revOrd.length-1; // soy el último en revelar
     if(!_hh.length){
       // sin sobrantes
-      listoLabel=esUltimo?'✅ ¡Sin sobrantes! — Confirmar Listo':'✅ ¡Sin sobrantes! — Listo';
+      listoLabel=esUltimo?t('act_no_left_sure'):t('act_no_left');
       listoStyle=`width:100%;padding:8px;border-radius:7px;border:none;background:${color};color:#1a1230;font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 10px rgba(201,168,76,.45)`;
     } else if(hayMas){
       // todavía hay opciones: listo es discreto
-      listoLabel='⚠️ Confirmá Listo — '+pts+' pts sobrantes';
+      listoLabel=t('act_warn_left',pts);
       listoStyle=`width:100%;padding:5px;border-radius:6px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.35);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation`;
     } else {
       // sobrantes sin más opciones
-      listoLabel='✓ Listo — '+pts+' pts sobrantes';
+      listoLabel=t('act_left',pts);
       listoStyle=`width:100%;padding:8px;border-radius:7px;border:none;background:${color};color:#1a1230;font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 10px rgba(201,168,76,.4)`;
     }
     // mostrar contador de tiempo si está corriendo
@@ -4358,7 +4720,7 @@ function drawActs(){
       const timerColor=seg>30?'#7be87b':seg>10?'#E8A84C':'#E24B4A';
       h+=`<div style="width:100%;max-width:300px;margin-top:2px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-          <span style="font-size:9px;color:rgba(232,220,200,.5);font-family:Cinzel,serif">⏱ Tiempo restante</span>
+          <span style="font-size:9px;color:rgba(232,220,200,.5);font-family:Cinzel,serif">${t('act_timer')}</span>
           <span style="font-size:11px;font-weight:700;color:${timerColor};font-family:Cinzel,serif">${seg}s</span>
         </div>
         <div style="width:100%;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden">
@@ -4408,18 +4770,18 @@ function drawActs(){
   const cs=selCards();let h='';
   switch(S.phase){
     case'first_discard':
-      h=cs.length===1?`<button class="btn pri" onclick="actDiscard()">Descartar y comenzar</button>`:`<span class="hint">Selecciona 1 carta para descartar</span>`;
+      h=cs.length===1?`<button class="btn pri" onclick="actDiscard()">${t('act_discard')}</button>`:`<span class="hint">${t('hint_sel_disc')}</span>`;
       break;
     case'play':
-      h=`<button class="btn dng" onclick="actGolpe()">¡GOLPEADO!</button>`;
-      h+=`<button class="btn" onclick="actTakeDisc()" ${!S.disc.length?'disabled':''}>Tomar descarte</button>`;
-      h+=`<button class="btn" onclick="actDraw()">Del mazo</button>`;
+      h=`<button class="btn dng" onclick="actGolpe()">${t('act_golpe')}</button>`;
+      h+=`<button class="btn" onclick="actTakeDisc()" ${!S.disc.length?'disabled':''}>${t('act_take_disc')}</button>`;
+      h+=`<button class="btn" onclick="actDraw()">${t('act_draw')}</button>`;
       break;
     case'drew':
-      if(!S.comboThisTurn&&cs.length>=3)h+=`<button class="btn" onclick="actShowCombo()">Mostrar combo</button>`;
-      if(cs.length===1)h+=`<button class="btn pri" onclick="actDiscard()">Descartar</button>`;
-      if(!cs.length)h+=`<span class="hint">${S.comboThisTurn?'Selecciona 1 para descartar':'Selecciona 1 para descartar ó 3+ para combo'}</span>`;
-      if(cs.length>1&&cs.length<3)h+=`<span class="hint">Selecciona 1 para descartar ó 3+ para combo</span>`;
+      if(!S.comboThisTurn&&cs.length>=3)h+=`<button class="btn" onclick="actShowCombo()">${t('act_show_combo')}</button>`;
+      if(cs.length===1)h+=`<button class="btn pri" onclick="actDiscard()">${t('act_discard')}</button>`;
+      if(!cs.length)h+=`<span class="hint">${S.comboThisTurn?t('hint_sel1'):t('hint_sel1or3')}</span>`;
+      if(cs.length>1&&cs.length<3)h+=`<span class="hint">${t('hint_sel1or3')}</span>`;
       break;
     case'took_discard':
       // Con _discTaken: necesita 2+ cartas de la mano (carta tomada ya está incluida)
@@ -4427,19 +4789,19 @@ function drawActs(){
         const puedeCombo=cs.length>=2&&validCombo([S._discTaken,...cs]);
         h=`<div style="display:flex;gap:6px;width:100%">`;
         h+=puedeCombo
-          ?`<button class="btn pri" style="flex:2" onclick="actShowCombo()">✅ Mostrar combo</button>`
-          :`<span class="hint" style="flex:2">Seleccioná 2+ cartas de tu mano para el combo</span>`;
-        h+=`<button class="btn" style="flex:1;border-color:rgba(226,75,74,.5);color:#E24B4A" onclick="actDevolverDisc()">↩ Devolver</button>`;
+          ?`<button class="btn pri" style="flex:2" onclick="actShowCombo()">✅ ${t('act_show_combo')}</button>`
+          :`<span class="hint" style="flex:2">${t('hint_sel3')}</span>`;
+        h+=`<button class="btn" style="flex:1;border-color:rgba(226,75,74,.5);color:#E24B4A" onclick="actDevolverDisc()">${t('act_return')}</button>`;
         h+=`</div>`;
       } else {
-        h=cs.length>=3?`<button class="btn pri" onclick="actShowCombo()">Mostrar combinación</button>`:`<span class="hint">Selecciona mín. 3 cartas (incluye la tomada)</span>`;
+        h=cs.length>=3?`<button class="btn pri" onclick="actShowCombo()">${t('act_show_comb2')}</button>`:`<span class="hint">${t('hint_sel_min3')}</span>`;
       }
       break;
     case'showed_combo':
-      h=cs.length===1?`<button class="btn pri" onclick="actDiscard()">Descartar</button>`:`<span class="hint">Selecciona 1 carta para descartar</span>`;
+      h=cs.length===1?`<button class="btn pri" onclick="actDiscard()">${t('act_discard')}</button>`:`<span class="hint">${t('hint_sel_disc')}</span>`;
       break;
     case'golpeado_reveal':
-      h=`<span class="hint">Esperando...</span>`;break;
+      h=`<span class="hint">${t('act_waiting')}</span>`;break;
   }
   ACT.innerHTML=h;
 }
@@ -4460,27 +4822,23 @@ function showFinalOv(){
   // calcular pagos y actualizar banco
   const payments=calcPayments(winners,adj,tie,gp,gWon);
 
-  const title=tie?'¡Empate!':(winners[0]===0?'¡GANASTE!':'¡'+PNAME(winners[0])+' gana!');
+  const title=tie?t('fin_tie'):(winners[0]===0?t('fin_winner_you'):t('fin_winner',PNAME(winners[0])));
   const jugadorPerdio=!winners.includes(0)&&!tie; // el jugador local perdió
 
   // Nota principal — explicación detallada del resultado
   let note='';
   if(tie){
-    note='Nadie gana en empate.';
+    note=t('fin_tie_note');
   } else if(gWon){
-    note=`${PNAME(gp)} ganó declarando GOLPEADO con ${adj[gp]} pts — el menor puntaje.`;
+    note=t('fin_win_golpe',PNAME(gp),adj[gp]);
   } else if(gp>=0&&!gWon){
     const ganadorNombre=PNAME(winners[0]);
     const ganadorPts=adj[winners[0]];
     const golpeadorPts=adj[gp];
-    const tieneComodinesGolpeador=usedBothWilds(gp);
-    let razones=[];
-    if(golpeadorPts>ganadorPts)razones.push(`tenía ${golpeadorPts} pts contra ${ganadorPts} pts de ${ganadorNombre}`);
-    if(tieneComodinesGolpeador)razones.push(`usó ambos comodines (+60 pts de penalización)`);
-    note=`${PNAME(gp)} declaró GOLPEADO pero no ganó — ${razones.join(' y ')}. Gana ${ganadorNombre} con ${ganadorPts} pts.`;
+    note=t('fin_lost_golpe',PNAME(gp),golpeadorPts,ganadorNombre,ganadorPts);
   } else {
     // Nadie golpeó — explicar quién ganó y por qué
-    note=`${PNAME(winners[0])} gana con el menor puntaje: ${adj[winners[0]]} pts.`;
+    note=t('fin_winner_note',PNAME(winners[0]),adj[winners[0]]);
   }
 
   // tabla de resultados
@@ -4507,22 +4865,11 @@ function showFinalOv(){
       const lineas=[];
 
       if(golpoSinGanar&&tieneComodines){
-        // Doble motivo: golpeó sin ganar Y tiene comodines
-        const ganadorNombre=PNAME(winners[0]);
-        const ganadorPts=adj[winners[0]];
-        lineas.push(`Declaró GOLPEADO con <strong>${adj[i]} pts</strong> pero ${ganadorNombre} tenía menos: <strong>${ganadorPts} pts</strong>.`);
-        lineas.push(`Además usó ambos comodines (★ Joker + ✦ Grupal) que suman <strong>+60 pts</strong> de penalización.`);
-        lineas.push(`<strong style="color:#E24B4A">Paga el doble por ambas razones.</strong>`);
+        lineas.push(t('fin_pen_both',PNAME(i),adj[i],PNAME(winners[0]),adj[winners[0]]));
       } else if(golpoSinGanar){
-        const ganadorNombre=PNAME(winners[0]);
-        const ganadorPts=adj[winners[0]];
-        lineas.push(`Declaró GOLPEADO con <strong>${adj[i]} pts</strong>.`);
-        lineas.push(`No ganó porque ${ganadorNombre} tenía menos puntos: <strong>${ganadorPts} pts</strong>.`);
-        lineas.push(`<strong style="color:#E24B4A">Paga el doble de la apuesta.</strong>`);
+        lineas.push(t('fin_pen_golpe_lost',PNAME(i),adj[i],PNAME(winners[0]),adj[winners[0]]));
       } else if(tieneComodines){
-        lineas.push(`Usó ambos comodines (★ Joker + ✦ Grupal) en la misma partida.`);
-        lineas.push(`Se suman <strong>+60 pts</strong> de penalización a su puntaje final (${scores[i]} + 60 = <strong>${adj[i]} pts</strong>).`);
-        lineas.push(`<strong style="color:#E24B4A">Paga el doble de la apuesta.</strong>`);
+        lineas.push(t('fin_pen_both_wilds',PNAME(i),scores[i],adj[i]));
       }
 
       penItems.push({name:PNAME(i),color:PCOLOR[i],icon:golpoSinGanar?'👊':'⚠️',lineas});
@@ -4530,7 +4877,7 @@ function showFinalOv(){
   }
   if(penItems.length){
     penResumen=`<div style="width:100%;max-width:300px;border:1px solid rgba(226,75,74,.35);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:rgba(226,75,74,.07)">
-      <div style="font-family:Cinzel,serif;font-size:9px;color:#E24B4A;margin-bottom:8px;letter-spacing:.05em">⚠️ PENALIZACIONES</div>`;
+      <div style="font-family:Cinzel,serif;font-size:9px;color:#E24B4A;margin-bottom:8px;letter-spacing:.05em">${t('fin_penalties')}</div>`;
     penItems.forEach((p,pi)=>{
       const isLast=pi===penItems.length-1;
       penResumen+=`<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:${isLast?0:8}px;font-size:10px;padding-bottom:${isLast?0:8}px;border-bottom:${isLast?'none':'1px solid rgba(226,75,74,.15)'}">
@@ -4562,9 +4909,9 @@ function showFinalOv(){
     });
     payHtml+=`</div>`;
   } else if(BET===0){
-    payHtml=`<div style="font-size:9px;color:rgba(232,220,200,.35);font-style:italic">Partida sin apuesta</div>`;
+    payHtml=`<div style="font-size:9px;color:rgba(232,220,200,.35);font-style:italic">${_lang==='en'?'No bet game':'Partida sin apuesta'}</div>`;
   } else if(tie){
-    payHtml=`<div style="font-size:9px;color:rgba(232,220,200,.35);font-style:italic">Empate — nadie paga</div>`;
+    payHtml=`<div style="font-size:9px;color:rgba(232,220,200,.35);font-style:italic">${_lang==='en'?'Tie — nobody pays':'Empate — nadie paga'}</div>`;
   }
 
   // En multijugador: botón nueva partida deshabilitado 10s para que todos lean resultados
@@ -4574,16 +4921,16 @@ function showFinalOv(){
   ov.innerHTML=`<h2>${title}</h2>
     ${jugadorPerdio?`<div style="text-align:center;margin:0 0 6px"><img src="${VASKO_GIF}" style="width:110px;height:110px;object-fit:cover;border-radius:10px;border:2px solid rgba(226,75,74,.35);display:inline-block"></div>`:''}
     <p>${note}</p>
-    <table class="rtbl"><tr><th>Jugador</th><th>Pts</th><th>Sobrantes</th></tr>${rows}</table>
+    <table class="rtbl"><tr><th>${_lang==='en'?'Player':'Jugador'}</th><th>Pts</th><th>${_lang==='en'?'Leftover':'Sobrantes'}</th></tr>${rows}</table>
     ${penResumen}${payHtml}
     <div style="display:flex;gap:8px;margin-top:6px;width:100%;max-width:280px;flex-wrap:wrap">
-      <button class="btn" id="OV_CUENTAS_BTN" style="flex:1;min-width:60px">💰 Cuentas</button>
+      <button class="btn" id="OV_CUENTAS_BTN" style="flex:1;min-width:60px">💰 ${_lang==='en'?'Accounts':'Cuentas'}</button>
       ${MP.mode==='solo'?`<button class="btn" id="OV_RANK_BTN" style="flex:1;min-width:60px">🏆 Ranking</button>`:''}
-      <button class="btn" id="OV_MESA_BTN" style="flex:1;min-width:60px">🃏 Ver mesa</button>
-      ${MP.mode==='multi'?`<button class="btn" id="OV_HIST_BTN" style="flex:1;min-width:60px">📜 Historial</button>`:''}
+      <button class="btn" id="OV_MESA_BTN" style="flex:1;min-width:60px">🃏 ${_lang==='en'?'View table':'Ver mesa'}</button>
+      ${MP.mode==='multi'?`<button class="btn" id="OV_HIST_BTN" style="flex:1;min-width:60px">📜 ${_lang==='en'?'History':'Historial'}</button>`:''}
       <button class="btn pri" id="OV_NUEVA_BTN" style="flex:2;min-width:80px;transition:opacity .3s"
         ${needsCountdown?'disabled':''}>
-        ${needsCountdown?`⏳ Nueva partida (${COUNTDOWN_SECS}s)`:'Nueva partida'}
+        ${needsCountdown?t('act_results_wait',COUNTDOWN_SECS):t('fin_new_game')}
       </button>
     </div>`;
 
@@ -4633,9 +4980,9 @@ function showFinalOv(){
         clearInterval(iv);
         nuevaBtn.disabled=false;
         nuevaBtn.style.opacity='1';
-        nuevaBtn.textContent='Nueva partida';
+        nuevaBtn.textContent=t('fin_new_game');
       } else {
-        nuevaBtn.textContent=`⏳ Nueva partida (${secs}s)`;
+        nuevaBtn.textContent=t('act_results_wait',secs);
       }
     },1000);
   }
@@ -4708,9 +5055,9 @@ document.addEventListener('click',unlockAudio,{once:true});
 
 // Esperar DOM completo antes de mostrar pantalla de inicio
 if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',()=>checkFirstVisit(showModeScreen));
+  document.addEventListener('DOMContentLoaded',()=>{_applyLangStatic();checkFirstVisit(showModeScreen);});
 } else {
-  checkFirstVisit(showModeScreen);
+  _applyLangStatic();checkFirstVisit(showModeScreen);
 }
 // ══════════════════════════════════════════════════════
 const SB_URL='https://czhjgebfburivutzbool.supabase.co';
@@ -4753,132 +5100,136 @@ function showHowToPlay(onClose){
   ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;z-index:900;padding:0;overflow:hidden';
 
   const tabs=[
-    {id:'obj',label:'🎯 Objetivo',short:'🎯'},
-    {id:'tur',label:'🔄 Turno',short:'🔄'},
-    {id:'com',label:'🃏 Combos',short:'🃏'},
-    {id:'gol',label:'👊 GOLPEADO',short:'👊'},
-    {id:'pen',label:'⚠️ Penaliz.',short:'⚠️'},
+    {id:'obj',short:'🎯'},
+    {id:'tur',short:'🔄'},
+    {id:'com',short:'🃏'},
+    {id:'gol',short:'👊'},
+    {id:'pen',short:'⚠️'},
   ];
 
-  const contenido={
+  const tabLabel=id=>({
+    obj:_lang==='en'?'Objective':'Objetivo',
+    tur:_lang==='en'?'Turn':'Turno',
+    com:'Combos',
+    gol:_lang==='en'?'Golpeado':'Golpeado',
+    pen:_lang==='en'?'Penalties':'Penaliz.',
+  }[id]||id);
+
+  const contenidoES={
     obj:`<div style="display:flex;flex-direction:column;gap:12px">
       <p style="color:rgba(232,220,200,.9);font-size:13px;line-height:1.7">Cada jugador recibe <strong style="color:var(--gold)">9 cartas</strong> (el primer jugador 10 y descarta 1 para comenzar). El objetivo es <strong style="color:var(--gold)">bajar todos tus combos</strong> y quedar con la menor cantidad de puntos en mano.</p>
       <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:12px">
         <div style="color:var(--gold);font-family:Cinzel,serif;font-size:11px;margin-bottom:6px">PUNTAJE DE CARTAS</div>
-        <div style="color:rgba(232,220,200,.8);font-size:12px;line-height:1.8">
-          As = 15 pts &nbsp;·&nbsp; 2 al 9 = valor nominal<br>
-          10, J, Q, K = 10 pts<br>
-          <span style="color:#C9A84C">★ Joker = 30 pts &nbsp;·&nbsp; ✦ Grupal = 30 pts</span>
-        </div>
+        <div style="color:rgba(232,220,200,.8);font-size:12px;line-height:1.8">As = 15 pts &nbsp;·&nbsp; 2 al 9 = valor nominal<br>10, J, Q, K = 10 pts<br><span style="color:#C9A84C">★ Joker = 30 pts &nbsp;·&nbsp; ✦ Grupal = 30 pts</span></div>
       </div>
       <p style="color:rgba(232,220,200,.7);font-size:12px;line-height:1.6">Gana quien tenga <strong style="color:#7be87b">menos puntos</strong> en cartas sobrantes al final de la ronda.</p>
     </div>`,
-
     tur:`<div style="display:flex;flex-direction:column;gap:10px">
       <p style="color:rgba(232,220,200,.9);font-size:13px;line-height:1.7">En tu turno debés hacer <strong style="color:var(--gold)">una de estas acciones</strong>:</p>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="background:rgba(74,158,232,.1);border:1px solid rgba(74,158,232,.3);border-radius:8px;padding:10px 12px">
-          <div style="color:#4A9EE8;font-size:12px;font-weight:700;margin-bottom:4px">1. TOMAR DEL MAZO</div>
-          <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Robás 1 carta. Podés mostrar 1 combo con ella o simplemente descartar 1 carta.</div>
-        </div>
-        <div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:10px 12px">
-          <div style="color:var(--gold);font-size:12px;font-weight:700;margin-bottom:4px">2. TOMAR EL DESCARTE</div>
-          <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Tomás la carta visible del descarte. <strong style="color:var(--gold)">Debés</strong> mostrar un combo que la incluya. Luego descartás 1.</div>
-        </div>
-        <div style="background:rgba(123,232,123,.1);border:1px solid rgba(123,232,123,.3);border-radius:8px;padding:10px 12px">
-          <div style="color:#7be87b;font-size:12px;font-weight:700;margin-bottom:4px">3. DECLARAR GOLPEADO</div>
-          <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Si creés que ganás — declarás GOLPEADO sin tomar carta. Se termina la ronda.</div>
-        </div>
+        <div style="background:rgba(74,158,232,.1);border:1px solid rgba(74,158,232,.3);border-radius:8px;padding:10px 12px"><div style="color:#4A9EE8;font-size:12px;font-weight:700;margin-bottom:4px">1. TOMAR DEL MAZO</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Robás 1 carta. Podés mostrar 1 combo con ella o simplemente descartar 1 carta.</div></div>
+        <div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:10px 12px"><div style="color:var(--gold);font-size:12px;font-weight:700;margin-bottom:4px">2. TOMAR EL DESCARTE</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Tomás la carta visible del descarte. <strong style="color:var(--gold)">Debés</strong> mostrar un combo que la incluya. Luego descartás 1.</div></div>
+        <div style="background:rgba(123,232,123,.1);border:1px solid rgba(123,232,123,.3);border-radius:8px;padding:10px 12px"><div style="color:#7be87b;font-size:12px;font-weight:700;margin-bottom:4px">3. DECLARAR GOLPEADO</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Si creés que ganás — declarás GOLPEADO sin tomar carta. Se termina la ronda.</div></div>
       </div>
       <p style="color:rgba(232,220,200,.6);font-size:11px;line-height:1.6">Al mostrar un combo podés también <strong>encajar cartas</strong> en combos ya bajados (tuyos o de otros).</p>
     </div>`,
-
     com:`<div style="display:flex;flex-direction:column;gap:10px">
       <p style="color:rgba(232,220,200,.9);font-size:13px;line-height:1.7">Un combo válido tiene <strong style="color:var(--gold)">mínimo 3 cartas</strong> y puede ser:</p>
       <div style="background:rgba(74,158,232,.08);border:1px solid rgba(74,158,232,.25);border-radius:8px;padding:10px 12px">
         <div style="color:#4A9EE8;font-size:12px;font-weight:700;margin-bottom:6px">ESCALERA — mismo palo, números consecutivos</div>
         <div style="color:rgba(232,220,200,.8);font-size:13px;letter-spacing:.05em">4♥ 5♥ 6♥ &nbsp;/&nbsp; Q♠ K♠ A♠ &nbsp;/&nbsp; K♣ A♣ 2♣</div>
         <div style="color:rgba(232,220,200,.5);font-size:11px;margin-top:4px">El As es circular: A,2,3 · Q,K,A · K,A,2 · Q,K,A,2</div>
-        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:10px">
-          <div style="width:42px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;border:1.5px solid rgba(201,168,76,.4)" id="HTP_JSVG"></div>
-          <div>
-            <div style="color:#C9A84C;font-size:12px;font-weight:700">★ Joker — comodín de ESCALERA</div>
-            <div style="color:rgba(232,220,200,.7);font-size:11px;line-height:1.6;margin-top:3px">Reemplaza cualquier carta en una escalera. Solo sirve en escaleras, no en grupos. Vale 30 pts si queda como sobrante.</div>
-          </div>
-        </div>
+        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:10px"><div style="width:42px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;border:1.5px solid rgba(201,168,76,.4)" id="HTP_JSVG"></div><div><div style="color:#C9A84C;font-size:12px;font-weight:700">★ Joker — comodín de ESCALERA</div><div style="color:rgba(232,220,200,.7);font-size:11px;line-height:1.6;margin-top:3px">Reemplaza cualquier carta en una escalera. Solo sirve en escaleras, no en grupos. Vale 30 pts si queda como sobrante.</div></div></div>
       </div>
       <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:8px;padding:10px 12px">
         <div style="color:var(--gold);font-size:12px;font-weight:700;margin-bottom:6px">GRUPO — mismo número, distintos palos</div>
         <div style="color:rgba(232,220,200,.8);font-size:13px;letter-spacing:.05em">7♥ 7♦ 7♣ &nbsp;/&nbsp; K♠ K♥ K♦ K♣</div>
-        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:10px">
-          <div style="width:42px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;border:1.5px solid rgba(15,110,86,.5)" id="HTP_WSVG"></div>
-          <div>
-            <div style="color:#0F6E56;font-size:12px;font-weight:700">✦ Grupal — comodín de GRUPO</div>
-            <div style="color:rgba(232,220,200,.7);font-size:11px;line-height:1.6;margin-top:3px">Reemplaza cualquier carta en un grupo. Solo sirve en grupos, no en escaleras. Vale 30 pts si queda como sobrante.</div>
-          </div>
-        </div>
+        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:10px"><div style="width:42px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;border:1.5px solid rgba(15,110,86,.5)" id="HTP_WSVG"></div><div><div style="color:#0F6E56;font-size:12px;font-weight:700">✦ Grupal — comodín de GRUPO</div><div style="color:rgba(232,220,200,.7);font-size:11px;line-height:1.6;margin-top:3px">Reemplaza cualquier carta en un grupo. Solo sirve en grupos, no en escaleras. Vale 30 pts si queda como sobrante.</div></div></div>
       </div>
       <div style="background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.2);border-radius:8px;padding:8px 12px"><div style="color:#E24B4A;font-size:11px;line-height:1.6">⚠️ Si terminás con <strong>★ Joker Y ✦ Grupal</strong> ambos como sobrantes — pagás el doble (se suman 60 pts extra).</div></div>
       <p style="color:rgba(232,220,200,.6);font-size:11px;line-height:1.6">Podés <strong>encajar</strong> cartas sueltas en combos existentes para reducir tus puntos sobrantes.</p>
     </div>`,
-
     gol:`<div style="display:flex;flex-direction:column;gap:10px">
       <p style="color:rgba(232,220,200,.9);font-size:13px;line-height:1.7">Cuando creés que tenés <strong style="color:var(--gold)">menos puntos que todos</strong>, declarás GOLPEADO en tu turno (sin tomar carta).</p>
-      <div style="background:rgba(232,220,200,.05);border:1px solid rgba(232,220,200,.15);border-radius:8px;padding:10px 12px">
-        <div style="color:rgba(232,220,200,.8);font-size:12px;font-weight:700;margin-bottom:6px">ORDEN DE REVELACIÓN</div>
-        <div style="color:rgba(232,220,200,.7);font-size:12px;line-height:1.8">
-          1. El jugador <strong>siguiente</strong> al que golpeó muestra primero<br>
-          2. Continúa en orden de turno<br>
-          3. El que golpeó muestra <strong>último</strong>
-        </div>
-      </div>
-      <div style="background:rgba(123,232,123,.08);border:1px solid rgba(123,232,123,.25);border-radius:8px;padding:10px 12px">
-        <div style="color:#7be87b;font-size:12px;font-weight:700;margin-bottom:4px">AL MOSTRAR TUS CARTAS</div>
-        <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Podés bajar combos, encajar cartas y reducir tus sobrantes antes de presionar Listo.</div>
-      </div>
-      <div style="background:rgba(232,155,0,.08);border:1px solid rgba(232,155,0,.3);border-radius:8px;padding:10px 12px">
-        <div style="color:#E8A84C;font-size:12px;font-weight:700;margin-bottom:4px">⏱ TIEMPO LÍMITE — 120 SEGUNDOS</div>
-        <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Cada jugador tiene <strong style="color:#E8A84C">180 segundos</strong> para mostrar sus combos y encajar. Una barra de tiempo visible cuenta regresivamente. Si se acaba el tiempo, se registran automáticamente las cartas que quedaron en mano como sobrantes y pasa el turno al siguiente.</div>
-      </div>
+      <div style="background:rgba(232,220,200,.05);border:1px solid rgba(232,220,200,.15);border-radius:8px;padding:10px 12px"><div style="color:rgba(232,220,200,.8);font-size:12px;font-weight:700;margin-bottom:6px">ORDEN DE REVELACIÓN</div><div style="color:rgba(232,220,200,.7);font-size:12px;line-height:1.8">1. El jugador <strong>siguiente</strong> al que golpeó muestra primero<br>2. Continúa en orden de turno<br>3. El que golpeó muestra <strong>último</strong></div></div>
+      <div style="background:rgba(123,232,123,.08);border:1px solid rgba(123,232,123,.25);border-radius:8px;padding:10px 12px"><div style="color:#7be87b;font-size:12px;font-weight:700;margin-bottom:4px">AL MOSTRAR TUS CARTAS</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Podés bajar combos, encajar cartas y reducir tus sobrantes antes de presionar Listo.</div></div>
+      <div style="background:rgba(232,155,0,.08);border:1px solid rgba(232,155,0,.3);border-radius:8px;padding:10px 12px"><div style="color:#E8A84C;font-size:12px;font-weight:700;margin-bottom:4px">⏱ TIEMPO LÍMITE — 180 SEGUNDOS</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Cada jugador tiene <strong style="color:#E8A84C">180 segundos</strong> para mostrar sus combos y encajar. Si se acaba el tiempo, se registran automáticamente las cartas en mano como sobrantes.</div></div>
     </div>`,
-
     pen:`<div style="display:flex;flex-direction:column;gap:10px">
       <p style="color:rgba(232,220,200,.9);font-size:13px;line-height:1.7">Hay dos situaciones donde un jugador <strong style="color:#E24B4A">paga el doble</strong>:</p>
-      <div style="background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.3);border-radius:8px;padding:10px 12px">
-        <div style="color:#E24B4A;font-size:12px;font-weight:700;margin-bottom:4px">⚠️ GOLPEÓ SIN GANAR</div>
-        <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Declaraste GOLPEADO pero otro jugador terminó con menos puntos. Pagás el doble a ese jugador.</div>
-      </div>
-      <div style="background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.3);border-radius:8px;padding:10px 12px">
-        <div style="color:#E24B4A;font-size:12px;font-weight:700;margin-bottom:4px">⚠️ USASTE LOS DOS COMODINES</div>
-        <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Usaste <strong>★ Joker Y ✦ Grupal</strong> en la misma ronda — ya sea en mano, en combos bajados o encajados en la mesa. Se suman <strong style="color:#E24B4A">60 pts extra</strong> a tu puntaje y pagás el doble al ganador.</div>
-      </div>
-      <div style="background:rgba(232,155,0,.08);border:1px solid rgba(232,155,0,.3);border-radius:8px;padding:10px 12px">
-        <div style="color:#E8A84C;font-size:12px;font-weight:700;margin-bottom:4px">⏱ TIEMPO AGOTADO</div>
-        <div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Si un jugador no presiona Listo dentro de los <strong style="color:#E8A84C">180 segundos</strong>, sus cartas restantes se registran automáticamente como sobrantes y el turno pasa al siguiente jugador.</div>
-      </div>
-      <div style="background:rgba(232,220,200,.05);border:1px solid rgba(232,220,200,.15);border-radius:8px;padding:10px 12px">
-        <div style="color:rgba(232,220,200,.7);font-size:12px;font-weight:700;margin-bottom:4px">EMPATE</div>
-        <div style="color:rgba(232,220,200,.6);font-size:12px;line-height:1.6">Si dos jugadores terminan con el mismo puntaje mínimo, nadie paga.</div>
-      </div>
+      <div style="background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.3);border-radius:8px;padding:10px 12px"><div style="color:#E24B4A;font-size:12px;font-weight:700;margin-bottom:4px">⚠️ GOLPEÓ SIN GANAR</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Declaraste GOLPEADO pero otro jugador terminó con menos puntos. Pagás el doble a ese jugador.</div></div>
+      <div style="background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.3);border-radius:8px;padding:10px 12px"><div style="color:#E24B4A;font-size:12px;font-weight:700;margin-bottom:4px">⚠️ USASTE LOS DOS COMODINES</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Usaste <strong>★ Joker Y ✦ Grupal</strong> en la misma ronda. Se suman <strong style="color:#E24B4A">60 pts extra</strong> a tu puntaje y pagás el doble al ganador.</div></div>
+      <div style="background:rgba(232,155,0,.08);border:1px solid rgba(232,155,0,.3);border-radius:8px;padding:10px 12px"><div style="color:#E8A84C;font-size:12px;font-weight:700;margin-bottom:4px">⏱ TIEMPO AGOTADO</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Si no presionás Listo dentro de los <strong style="color:#E8A84C">180 segundos</strong>, tus cartas restantes se registran automáticamente como sobrantes.</div></div>
+      <div style="background:rgba(232,220,200,.05);border:1px solid rgba(232,220,200,.15);border-radius:8px;padding:10px 12px"><div style="color:rgba(232,220,200,.7);font-size:12px;font-weight:700;margin-bottom:4px">EMPATE</div><div style="color:rgba(232,220,200,.6);font-size:12px;line-height:1.6">Si dos jugadores terminan con el mismo puntaje mínimo, nadie paga.</div></div>
     </div>`,
   };
 
+  const contenidoEN={
+    obj:`<div style="display:flex;flex-direction:column;gap:12px">
+      <p style="color:rgba(232,220,200,.9);font-size:13px;line-height:1.7">Each player receives <strong style="color:var(--gold)">9 cards</strong> (the first player gets 10 and discards 1 to start). The goal is to <strong style="color:var(--gold)">lay down all your combos</strong> and finish with the fewest points in hand.</p>
+      <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:12px">
+        <div style="color:var(--gold);font-family:Cinzel,serif;font-size:11px;margin-bottom:6px">CARD VALUES</div>
+        <div style="color:rgba(232,220,200,.8);font-size:12px;line-height:1.8">Ace = 15 pts &nbsp;·&nbsp; 2 to 9 = face value<br>10, J, Q, K = 10 pts<br><span style="color:#C9A84C">★ Joker = 30 pts &nbsp;·&nbsp; ✦ Group Wild = 30 pts</span></div>
+      </div>
+      <p style="color:rgba(232,220,200,.7);font-size:12px;line-height:1.6">The player with the <strong style="color:#7be87b">fewest points</strong> in leftover cards wins the round.</p>
+    </div>`,
+    tur:`<div style="display:flex;flex-direction:column;gap:10px">
+      <p style="color:rgba(232,220,200,.9);font-size:13px;line-height:1.7">On your turn you must do <strong style="color:var(--gold)">one of these actions</strong>:</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="background:rgba(74,158,232,.1);border:1px solid rgba(74,158,232,.3);border-radius:8px;padding:10px 12px"><div style="color:#4A9EE8;font-size:12px;font-weight:700;margin-bottom:4px">1. DRAW FROM DECK</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Draw 1 card. You may show 1 combo with it or simply discard 1 card.</div></div>
+        <div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:10px 12px"><div style="color:var(--gold);font-size:12px;font-weight:700;margin-bottom:4px">2. TAKE THE DISCARD</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Take the top discard card. You <strong style="color:var(--gold)">must</strong> show a combo including it. Then discard 1.</div></div>
+        <div style="background:rgba(123,232,123,.1);border:1px solid rgba(123,232,123,.3);border-radius:8px;padding:10px 12px"><div style="color:#7be87b;font-size:12px;font-weight:700;margin-bottom:4px">3. DECLARE GOLPEADO</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">If you think you win — declare GOLPEADO without drawing. The round ends.</div></div>
+      </div>
+      <p style="color:rgba(232,220,200,.6);font-size:11px;line-height:1.6">When showing a combo you can also <strong>fit cards</strong> into already laid down combos (yours or others').</p>
+    </div>`,
+    com:`<div style="display:flex;flex-direction:column;gap:10px">
+      <p style="color:rgba(232,220,200,.9);font-size:13px;line-height:1.7">A valid combo has <strong style="color:var(--gold)">at least 3 cards</strong> and can be:</p>
+      <div style="background:rgba(74,158,232,.08);border:1px solid rgba(74,158,232,.25);border-radius:8px;padding:10px 12px">
+        <div style="color:#4A9EE8;font-size:12px;font-weight:700;margin-bottom:6px">RUN — same suit, consecutive numbers</div>
+        <div style="color:rgba(232,220,200,.8);font-size:13px;letter-spacing:.05em">4♥ 5♥ 6♥ &nbsp;/&nbsp; Q♠ K♠ A♠ &nbsp;/&nbsp; K♣ A♣ 2♣</div>
+        <div style="color:rgba(232,220,200,.5);font-size:11px;margin-top:4px">Ace is circular: A,2,3 · Q,K,A · K,A,2 · Q,K,A,2</div>
+        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:10px"><div style="width:42px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;border:1.5px solid rgba(201,168,76,.4)" id="HTP_JSVG"></div><div><div style="color:#C9A84C;font-size:12px;font-weight:700">★ Joker — RUN wild</div><div style="color:rgba(232,220,200,.7);font-size:11px;line-height:1.6;margin-top:3px">Replaces any card in a run. Only works in runs, not groups. Worth 30 pts if leftover.</div></div></div>
+      </div>
+      <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:8px;padding:10px 12px">
+        <div style="color:var(--gold);font-size:12px;font-weight:700;margin-bottom:6px">GROUP — same number, different suits</div>
+        <div style="color:rgba(232,220,200,.8);font-size:13px;letter-spacing:.05em">7♥ 7♦ 7♣ &nbsp;/&nbsp; K♠ K♥ K♦ K♣</div>
+        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:10px"><div style="width:42px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;border:1.5px solid rgba(15,110,86,.5)" id="HTP_WSVG"></div><div><div style="color:#0F6E56;font-size:12px;font-weight:700">✦ Group Wild — GROUP wild</div><div style="color:rgba(232,220,200,.7);font-size:11px;line-height:1.6;margin-top:3px">Replaces any card in a group. Only works in groups, not runs. Worth 30 pts if leftover.</div></div></div>
+      </div>
+      <div style="background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.2);border-radius:8px;padding:8px 12px"><div style="color:#E24B4A;font-size:11px;line-height:1.6">⚠️ If you end with <strong>★ Joker AND ✦ Group Wild</strong> both as leftovers — you pay double (60 extra pts).</div></div>
+      <p style="color:rgba(232,220,200,.6);font-size:11px;line-height:1.6">You can <strong>fit</strong> loose cards into existing combos to reduce your leftover points.</p>
+    </div>`,
+    gol:`<div style="display:flex;flex-direction:column;gap:10px">
+      <p style="color:rgba(232,220,200,.9);font-size:13px;line-height:1.7">When you think you have <strong style="color:var(--gold)">fewer points than everyone</strong>, declare GOLPEADO on your turn (without drawing).</p>
+      <div style="background:rgba(232,220,200,.05);border:1px solid rgba(232,220,200,.15);border-radius:8px;padding:10px 12px"><div style="color:rgba(232,220,200,.8);font-size:12px;font-weight:700;margin-bottom:6px">REVEAL ORDER</div><div style="color:rgba(232,220,200,.7);font-size:12px;line-height:1.8">1. The player <strong>next</strong> to whoever declared reveals first<br>2. Continue in turn order<br>3. The one who declared reveals <strong>last</strong></div></div>
+      <div style="background:rgba(123,232,123,.08);border:1px solid rgba(123,232,123,.25);border-radius:8px;padding:10px 12px"><div style="color:#7be87b;font-size:12px;font-weight:700;margin-bottom:4px">WHEN REVEALING YOUR HAND</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">You can lay down combos, fit cards, and reduce your leftovers before pressing Done.</div></div>
+      <div style="background:rgba(232,155,0,.08);border:1px solid rgba(232,155,0,.3);border-radius:8px;padding:10px 12px"><div style="color:#E8A84C;font-size:12px;font-weight:700;margin-bottom:4px">⏱ TIME LIMIT — 180 SECONDS</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">Each player has <strong style="color:#E8A84C">180 seconds</strong> to show combos and fit cards. If time runs out, remaining hand cards are recorded as leftovers automatically.</div></div>
+    </div>`,
+    pen:`<div style="display:flex;flex-direction:column;gap:10px">
+      <p style="color:rgba(232,220,200,.9);font-size:13px;line-height:1.7">There are two situations where a player <strong style="color:#E24B4A">pays double</strong>:</p>
+      <div style="background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.3);border-radius:8px;padding:10px 12px"><div style="color:#E24B4A;font-size:12px;font-weight:700;margin-bottom:4px">⚠️ DECLARED GOLPEADO WITHOUT WINNING</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">You declared GOLPEADO but another player had fewer points. You pay double to that player.</div></div>
+      <div style="background:rgba(226,75,74,.1);border:1px solid rgba(226,75,74,.3);border-radius:8px;padding:10px 12px"><div style="color:#E24B4A;font-size:12px;font-weight:700;margin-bottom:4px">⚠️ USED BOTH WILDS</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">You used <strong>★ Joker AND ✦ Group Wild</strong> in the same round. <strong style="color:#E24B4A">+60 pts</strong> are added to your score and you pay double to the winner.</div></div>
+      <div style="background:rgba(232,155,0,.08);border:1px solid rgba(232,155,0,.3);border-radius:8px;padding:10px 12px"><div style="color:#E8A84C;font-size:12px;font-weight:700;margin-bottom:4px">⏱ TIME UP</div><div style="color:rgba(232,220,200,.75);font-size:12px;line-height:1.6">If you don't press Done within <strong style="color:#E8A84C">180 seconds</strong>, your remaining cards are automatically recorded as leftovers.</div></div>
+      <div style="background:rgba(232,220,200,.05);border:1px solid rgba(232,220,200,.15);border-radius:8px;padding:10px 12px"><div style="color:rgba(232,220,200,.7);font-size:12px;font-weight:700;margin-bottom:4px">TIE</div><div style="color:rgba(232,220,200,.6);font-size:12px;line-height:1.6">If two players finish with the same minimum score, nobody pays.</div></div>
+    </div>`,
+  };
+
+  const contenido=_lang==='en'?contenidoEN:contenidoES;
   let tabActivo='obj';
 
   function render(){
     ov.innerHTML=`
       <div style="width:100%;display:flex;flex-direction:column;height:100%">
         <div style="padding:18px 20px 10px;border-bottom:1px solid rgba(201,168,76,.15)">
-          <div style="font-family:Cinzel,serif;font-size:clamp(16px,2.5vw,22px);color:var(--gold);text-align:center;letter-spacing:.08em">🃏 Cómo se juega</div>
+          <div style="font-family:Cinzel,serif;font-size:clamp(16px,2.5vw,22px);color:var(--gold);text-align:center;letter-spacing:.08em">🃏 ${_lang==='en'?'How to play':'Cómo se juega'}</div>
         </div>
         <div style="display:flex;gap:0;border-bottom:1px solid rgba(201,168,76,.15);flex-shrink:0">
-          ${tabs.map(t=>`<button id="HTP_TAB_${t.id}" style="flex:1;padding:8px 4px;background:${tabActivo===t.id?'rgba(201,168,76,.12)':'transparent'};border:none;border-bottom:3px solid ${tabActivo===t.id?'var(--gold)':'transparent'};color:${tabActivo===t.id?'var(--gold)':'rgba(232,220,200,.5)'};font-family:Cinzel,serif;font-size:9px;cursor:pointer;white-space:nowrap;touch-action:manipulation;text-align:center;display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font-size:15px">${t.short}</span><span style="font-size:8px;opacity:.8">${t.id==='obj'?'Objetivo':t.id==='tur'?'Turno':t.id==='com'?'Combos':t.id==='gol'?'Golpeado':'Penaliz.'}</span></button>`).join('')}
+          ${tabs.map(tb=>`<button id="HTP_TAB_${tb.id}" style="flex:1;padding:8px 4px;background:${tabActivo===tb.id?'rgba(201,168,76,.12)':'transparent'};border:none;border-bottom:3px solid ${tabActivo===tb.id?'var(--gold)':'transparent'};color:${tabActivo===tb.id?'var(--gold)':'rgba(232,220,200,.5)'};font-family:Cinzel,serif;font-size:9px;cursor:pointer;white-space:nowrap;touch-action:manipulation;text-align:center;display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font-size:15px">${tb.short}</span><span style="font-size:8px;opacity:.8">${tabLabel(tb.id)}</span></button>`).join('')}
         </div>
         <div style="flex:1;overflow-y:auto;padding:clamp(16px,3vw,28px) clamp(20px,4vw,40px)">
           ${contenido[tabActivo]}
         </div>
         <div style="padding:12px 20px;border-top:1px solid rgba(201,168,76,.15);flex-shrink:0">
-          <button id="HTP_OK" style="width:100%;padding:12px;border-radius:8px;border:none;background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">¡Entendido, a jugar! →</button>
+          <button id="HTP_OK" style="width:100%;padding:12px;border-radius:8px;border:none;background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">${_lang==='en'?'Got it, let\'s play! →':'¡Entendido, a jugar! →'}</button>
         </div>
       </div>`;
 
@@ -4942,23 +5293,26 @@ function showModeScreen(){
   ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:800;padding:24px';
   ov.innerHTML=`
     <div style="font-family:Cinzel,serif;font-size:28px;color:var(--gold);letter-spacing:.12em;text-align:center">🃏 GOLPEADO</div>
-    <div style="font-size:11px;color:rgba(232,220,200,.45);text-align:center;letter-spacing:.05em">Elige cómo querés jugar</div>
+    <div style="font-size:11px;color:rgba(232,220,200,.45);text-align:center;letter-spacing:.05em">${t('menu_subtitle')}</div>
     <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:280px">
+      <button id="MS_LANG" style="align-self:flex-end;padding:6px 14px;border-radius:20px;border:1.5px solid rgba(201,168,76,.5);background:rgba(201,168,76,.1);color:var(--gold);font-family:Cinzel,serif;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;letter-spacing:.06em">${t('lang_btn')} 🌐</button>
       <button id="MS_HTP" style="padding:8px;border-radius:8px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.5);font-family:Cinzel,serif;font-size:11px;cursor:pointer;touch-action:manipulation">
-        ❓ ¿Cómo se juega? Ver reglas
+        ${t('menu_rules')}
       </button>
       <button id="MS_SOLO" style="padding:14px;border-radius:8px;border:2px solid var(--gold);background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">
-        🤖 Jugar con Bots
+        ${t('menu_solo')}
       </button>
-
       <button id="MS_CREAR" style="padding:14px;border-radius:8px;border:2px solid #4A9EE8;background:transparent;color:#4A9EE8;font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">
-        🌐 Crear sala multijugador
+        ${t('menu_create')}
       </button>
       <button id="MS_UNIR" style="padding:14px;border-radius:8px;border:2px solid rgba(232,220,200,.4);background:transparent;color:rgba(232,220,200,.8);font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation">
-        🔗 Unirse a sala
+        ${t('menu_join')}
       </button>
       <button id="MS_HIST" style="padding:10px;border-radius:8px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.45);font-family:Cinzel,serif;font-size:11px;cursor:pointer;touch-action:manipulation">
-        📜 Ver historial de sala
+        ${t('menu_history')}
+      </button>
+      <button id="MS_CRED" style="padding:8px;border-radius:8px;border:none;background:transparent;color:rgba(232,220,200,.25);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">
+        ${t('menu_about')}
       </button>
     </div>`;
   $('G').appendChild(ov);
@@ -4966,13 +5320,16 @@ function showModeScreen(){
   const crear=ov.querySelector('#MS_CREAR');
   const unir=ov.querySelector('#MS_UNIR');
   const tap=(btn,fn)=>{btn.addEventListener('click',fn);btn.addEventListener('touchend',e=>{e.preventDefault();fn();},{passive:false});};
+  const langBtn=ov.querySelector('#MS_LANG');
+  if(langBtn)tap(langBtn,()=>setLang(_lang==='es'?'en':'es'));
   const htp=ov.querySelector('#MS_HTP');if(htp)tap(htp,()=>showHowToPlay());
   tap(solo,async()=>{
-    solo.disabled=true;solo.style.opacity='.6';solo.textContent='⏳ Verificando...';
+    solo.disabled=true;solo.style.opacity='.6';solo.textContent=t('verifying');
     const libre=await verificarLimiteSolo();
-    if(!libre){solo.disabled=false;solo.style.opacity='';solo.textContent='🤖 Jugar con Bots';showServidorLleno('solo',()=>showModeScreen());return;}
+    if(!libre){solo.disabled=false;solo.style.opacity='';solo.textContent=t('menu_solo');showServidorLleno('solo',()=>showModeScreen());return;}
     MP.mode='solo';rmEl('MODE_OV');
     registrarSesionSolo();
+    registrarVisita('solo');
     startGame();
   });
 
@@ -4980,6 +5337,43 @@ function showModeScreen(){
   tap(unir,()=>showNombreScreen('unir'));
   const hist=ov.querySelector('#MS_HIST');
   if(hist)tap(hist,()=>showHistorialOv(''));
+  const cred=ov.querySelector('#MS_CRED');
+  if(cred)tap(cred,()=>showCreditsOv());
+}
+
+// ── PANTALLA DE CRÉDITOS ──
+function showCreditsOv(){
+  rmEl('CREDITS_OV');
+  const ov=document.createElement('div');ov.id='CREDITS_OV';
+  ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;z-index:900;padding:28px;text-align:center';
+  ov.innerHTML=`
+    <div style="font-family:Cinzel,serif;font-size:20px;color:var(--gold);letter-spacing:.08em">${t('cred_title')}</div>
+
+    <div style="display:flex;flex-direction:column;gap:16px;max-width:300px">
+      <div style="background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.18);border-radius:10px;padding:14px 16px">
+        <div style="font-size:18px;margin-bottom:8px">📍</div>
+        <p style="font-size:12px;color:rgba(232,220,200,.85);line-height:1.7">${t('cred_origin')}</p>
+      </div>
+
+      <div style="background:rgba(74,158,232,.07);border:1px solid rgba(74,158,232,.2);border-radius:10px;padding:14px 16px">
+        <div style="font-size:18px;margin-bottom:8px">✦</div>
+        <p style="font-size:12px;color:rgba(232,220,200,.85);line-height:1.7">${t('cred_innovation')}</p>
+      </div>
+
+      <div style="padding:6px 0">
+        <div style="font-size:11px;color:rgba(232,220,200,.4);letter-spacing:.08em;font-family:Cinzel,serif;margin-bottom:4px">${t('cred_dev')}</div>
+        <div style="font-family:Cinzel,serif;font-size:16px;color:var(--gold);letter-spacing:.1em">MiltonGR</div>
+      </div>
+    </div>
+
+    <button id="CRED_CLO" style="padding:11px 32px;border-radius:8px;border:1.5px solid rgba(201,168,76,.5);background:transparent;color:var(--gold);font-family:Cinzel,serif;font-size:12px;cursor:pointer;touch-action:manipulation;letter-spacing:.06em">
+      ${t('cred_back')}
+    </button>`;
+  $('G').appendChild(ov);
+  const clo=ov.querySelector('#CRED_CLO');
+  const doClose=()=>{ov.remove();showModeScreen();};
+  clo.addEventListener('click',doClose);
+  clo.addEventListener('touchend',e=>{e.preventDefault();doClose();},{passive:false});
 }
 
 // ── PANTALLA DE NOMBRE ──
@@ -4991,21 +5385,21 @@ function showNombreScreen(accion){
   const ov=document.createElement('div');ov.id='NOM_OV';
   ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:800;padding:24px';
   ov.innerHTML=`
-    <div style="font-family:Cinzel,serif;font-size:20px;color:var(--gold)">${accion==='crear'?'🌐 Crear sala':'🔗 Unirse a sala'}</div>
-    ${vienePorEnlace&&urlSala?`<div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center">Sala: <span style="color:var(--gold);font-family:Cinzel,serif;font-weight:700">${urlSala}</span></div>`:''}
+    <div style="font-family:Cinzel,serif;font-size:20px;color:var(--gold)">${accion==='crear'?t('name_create_title'):t('name_join_title')}</div>
+    ${vienePorEnlace&&urlSala?`<div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center">${t('hist_sala')}: <span style="color:var(--gold);font-family:Cinzel,serif;font-weight:700">${urlSala}</span></div>`:''}
     <div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:280px">
-      <label style="font-size:10px;color:rgba(232,220,200,.6);font-family:Cinzel,serif">TU NOMBRE</label>
-      <input id="NOM_INPUT" placeholder="Ej: Carlitos" maxlength="16"
+      <label style="font-size:10px;color:rgba(232,220,200,.6);font-family:Cinzel,serif">${t('name_label')}</label>
+      <input id="NOM_INPUT" placeholder="${t('name_placeholder')}" maxlength="16"
         style="padding:10px 14px;border-radius:7px;border:1.5px solid rgba(201,168,76,.4);background:rgba(0,0,0,.4);color:#e8dcc8;font-family:Cinzel,serif;font-size:14px;outline:none;width:100%">
       ${accion==='unir'&&!vienePorEnlace?`
-      <label style="font-size:10px;color:rgba(232,220,200,.6);font-family:Cinzel,serif;margin-top:6px">CÓDIGO DE SALA</label>
-      <input id="SALA_INPUT" placeholder="Ej: AB12CD" maxlength="8" value="${urlSala}"
+      <label style="font-size:10px;color:rgba(232,220,200,.6);font-family:Cinzel,serif;margin-top:6px">${t('name_sala_label')}</label>
+      <input id="SALA_INPUT" placeholder="${t('name_sala_placeholder')}" maxlength="8" value="${urlSala}"
         style="padding:10px 14px;border-radius:7px;border:1.5px solid rgba(201,168,76,.4);background:rgba(0,0,0,.4);color:#e8dcc8;font-family:Cinzel,serif;font-size:14px;outline:none;width:100%;text-transform:uppercase">
       `:''}
     </div>
     <div style="display:flex;gap:8px;width:100%;max-width:280px">
-      ${!vienePorEnlace?`<button id="NOM_BACK" style="flex:1;padding:10px;border-radius:7px;border:1.5px solid rgba(232,220,200,.3);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">← Volver</button>`:''}
-      <button id="NOM_OK" style="flex:2;padding:12px;border-radius:7px;border:none;background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;width:100%">${accion==='crear'?'Crear sala →':'Entrar a la sala →'}</button>
+      ${!vienePorEnlace?`<button id="NOM_BACK" style="flex:1;padding:10px;border-radius:7px;border:1.5px solid rgba(232,220,200,.3);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">${t('name_back')}</button>`:''}
+      <button id="NOM_OK" style="flex:2;padding:12px;border-radius:7px;border:none;background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;width:100%">${accion==='crear'?t('name_create_btn'):t('name_join_btn')}</button>
     </div>
     <div id="NOM_ERR" style="font-size:10px;color:#E24B4A;min-height:14px"></div>`;
   $('G').appendChild(ov);
@@ -5034,6 +5428,8 @@ function showNombreScreen(accion){
     MP.myId=genId();
     // guardar nombre para facilitar reconexión
     try{localStorage.setItem('golpeado_nombre',nombre);}catch(e){}
+    // cerrar teclado en móvil antes de navegar
+    inp.blur();
     if(accion==='crear'){
       MP.salaId=genId(6);
       MP._lastSalaId=MP.salaId;
@@ -5043,6 +5439,7 @@ function showNombreScreen(accion){
     } else {
       // código viene del URL o del input
       const salaInput=ov.querySelector('#SALA_INPUT');
+      if(salaInput)salaInput.blur();
       const codigo=vienePorEnlace?urlSala:(salaInput?.value||'').trim().toUpperCase();
       if(!codigo){err.textContent='Ingresá el código de sala.';return;}
       MP.salaId=codigo;
@@ -5252,14 +5649,14 @@ async function showRankingScreen(){
   ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:850;padding:18px 14px;overflow-y:auto';
 
   ov.innerHTML=`
-    <div style="font-family:Cinzel,serif;font-size:18px;color:var(--gold);letter-spacing:.1em;padding-top:4px">🏆 RANKING DE RACHAS</div>
-    <div style="font-size:9px;color:rgba(232,220,200,.4);font-family:Cinzel,serif;letter-spacing:.05em">VICTORIAS CONSECUTIVAS VS BOTS</div>
+    <div style="font-family:Cinzel,serif;font-size:18px;color:var(--gold);letter-spacing:.1em;padding-top:4px">🏆 ${_lang==='en'?'STREAK RANKING':'RANKING DE RACHAS'}</div>
+    <div style="font-size:9px;color:rgba(232,220,200,.4);font-family:Cinzel,serif;letter-spacing:.05em">${_lang==='en'?'CONSECUTIVE WINS VS BOTS':'VICTORIAS CONSECUTIVAS VS BOTS'}</div>
     <div id="RANK_LIST" style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:5px">
-      <div style="color:rgba(232,220,200,.4);font-size:11px;text-align:center;padding:20px">Cargando...</div>
+      <div style="color:rgba(232,220,200,.4);font-size:11px;text-align:center;padding:20px">${t('hist_loading')}</div>
     </div>
     <div id="RANK_PAGES" style="display:flex;gap:8px;align-items:center;margin-top:2px"></div>
     <button id="RANK_CLOSE" style="width:100%;max-width:320px;padding:10px;border-radius:8px;border:1px solid rgba(232,220,200,.3);background:transparent;color:rgba(232,220,200,.7);font-family:Cinzel,serif;font-size:11px;cursor:pointer;touch-action:manipulation;margin-top:4px">
-      ✕ Cerrar
+      ✕ ${t('hist_close')}
     </button>`;
 
   $('G').appendChild(ov);
@@ -5278,7 +5675,7 @@ async function rankingLoadPage(ov,page){
   _rankPage=page;
   const listEl=ov.querySelector('#RANK_LIST');
   const pagesEl=ov.querySelector('#RANK_PAGES');
-  listEl.innerHTML='<div style="color:rgba(232,220,200,.4);font-size:11px;text-align:center;padding:20px">Cargando...</div>';
+  listEl.innerHTML=`<div style="color:rgba(232,220,200,.4);font-size:11px;text-align:center;padding:20px">${t('hist_loading')}</div>`;
 
   try{
     // Obtener total para paginación
@@ -5290,7 +5687,7 @@ async function rankingLoadPage(ov,page){
     const rows=await sbFetch('/rest/v1/ranking?select=*&order=racha.desc,created_at.asc&limit='+RANK_PER_PAGE+'&offset='+offset);
 
     if(!rows||!rows.length){
-      listEl.innerHTML='<div style="color:rgba(232,220,200,.4);font-size:11px;text-align:center;padding:20px">Sin registros aún. ¡Sé el primero!</div>';
+      listEl.innerHTML=`<div style="color:rgba(232,220,200,.4);font-size:11px;text-align:center;padding:20px">${t('rank_nobody').replace('\n','<br>')}</div>`;
       pagesEl.innerHTML='';
       return;
     }
@@ -5304,7 +5701,7 @@ async function rankingLoadPage(ov,page){
       const bg=pos===1?'rgba(201,168,76,.12)':pos===2?'rgba(180,180,180,.08)':pos===3?'rgba(176,102,41,.08)':'rgba(255,255,255,.03)';
       const border=pos===1?'rgba(201,168,76,.35)':pos===2?'rgba(180,180,180,.25)':pos===3?'rgba(176,102,41,.25)':'rgba(255,255,255,.07)';
       const diasR=isTop3?diasEnTop(r.created_at):null;
-      const diasHtmlR=diasR?`<span style="color:rgba(255,200,60,.75);font-style:italic"> · 👑 ${diasR} en el top</span>`:'';
+      const diasHtmlR=diasR?`<span style="color:rgba(255,200,60,.75);font-style:italic"> · ${t('rank_days_top',diasR)}</span>`:'';
       const paisBanderaR=`${r.bandera||'🌍'} ${r.pais||''}`.trim();
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid ${border};background:${bg}">
         <span style="font-size:${isTop3?'18':'13'}px;min-width:22px;text-align:center">${medal}</span>
@@ -5317,7 +5714,7 @@ async function rankingLoadPage(ov,page){
         </div>
         <div style="text-align:right">
           <div style="font-family:Cinzel,serif;font-size:16px;color:${isTop3?'var(--gold)':'rgba(232,220,200,.7)'};font-weight:700">${r.racha}</div>
-          <div style="font-size:8px;color:rgba(232,220,200,.35)">victorias</div>
+          <div style="font-size:8px;color:rgba(232,220,200,.35)">${t('rank_streak')}</div>
         </div>
       </div>`;
     });
@@ -5327,13 +5724,13 @@ async function rankingLoadPage(ov,page){
     if(totalPages>1){
       let pHtml='';
       const btnStyle=(active)=>`padding:5px 10px;border-radius:6px;border:1px solid rgba(201,168,76,${active?.5:.2});background:${active?'rgba(201,168,76,.15)':'transparent'};color:${active?'var(--gold)':'rgba(232,220,200,.45)'};font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation`;
-      if(page>1)pHtml+=`<button class="rank-page-btn" data-page="${page-1}" style="${btnStyle(false)}">‹ Ant</button>`;
+      if(page>1)pHtml+=`<button class="rank-page-btn" data-page="${page-1}" style="${btnStyle(false)}">‹ ${_lang==='en'?'Prev':'Ant'}</button>`;
       // páginas numeradas (máximo 5 alrededor de la actual)
       const start=Math.max(1,page-2);const end=Math.min(totalPages,page+2);
       for(let p=start;p<=end;p++){
         pHtml+=`<button class="rank-page-btn" data-page="${p}" style="${btnStyle(p===page)}">${p}</button>`;
       }
-      if(page<totalPages)pHtml+=`<button class="rank-page-btn" data-page="${page+1}" style="${btnStyle(false)}">Sig ›</button>`;
+      if(page<totalPages)pHtml+=`<button class="rank-page-btn" data-page="${page+1}" style="${btnStyle(false)}">${_lang==='en'?'Next':'Sig'} ›</button>`;
       pagesEl.innerHTML=pHtml;
       pagesEl.querySelectorAll('.rank-page-btn').forEach(btn=>{
         btn.addEventListener('click',()=>rankingLoadPage(ov,+btn.dataset.page));
@@ -5343,7 +5740,7 @@ async function rankingLoadPage(ov,page){
       pagesEl.innerHTML='';
     }
   }catch(e){
-    listEl.innerHTML=`<div style="color:#E24B4A;font-size:10px;text-align:center;padding:10px">Error al cargar el ranking.<br>${e.message}</div>`;
+    listEl.innerHTML=`<div style="color:#E24B4A;font-size:10px;text-align:center;padding:10px">${_lang==='en'?'Error loading ranking':'Error al cargar el ranking'}.<br>${e.message}</div>`;
   }
 }
 
@@ -5443,10 +5840,10 @@ async function sbCreate(salaId,estado){
 
 // ── CREAR SALA ──
 async function crearSala(){
-  showLobbyLoading('Verificando disponibilidad...');
+  showLobbyLoading(t('lob_loading'));
   const libre=await verificarLimiteMulti();
   if(!libre){rmEl('LOBBY_OV');showServidorLleno('multi',()=>crearSala());return;}
-  showLobbyLoading('Creando sala...');
+  showLobbyLoading(t('lob_creating'));
   const estado={
     fase:'lobby',
     host:MP.myId,
@@ -5459,18 +5856,19 @@ async function crearSala(){
   try{
     await sbCreate(MP.salaId,estado);
     MP.mySlot=0;
+    registrarVisita('multi');
     suscribirSala(()=>showLobbyHost(estado));
   }catch(e){
-    showError('Error creando sala: '+e.message);
+    showError(t('lob_err_create')+e.message);
   }
 }
 
 // ── UNIRSE A SALA ──
 async function unirseASala(){
-  showLobbyLoading('Buscando sala...');
+  showLobbyLoading(t('lob_searching'));
   try{
     const row=await sbGet(MP.salaId);
-    if(!row){showError('Sala no encontrada. Verificá el código.');return;}
+    if(!row){showError(t('lob_not_found'));return;}
     const estado=row.estado;
 
     // ── RECONEXIÓN: verificar si el jugador ya estaba en la sala ──
@@ -5495,17 +5893,18 @@ async function unirseASala(){
     }
 
     // ── NUEVO JUGADOR ──
-    if(estado.fase!=='lobby'){showError('La partida ya está en curso. Si eras parte de esta sala, ingresá con el mismo nombre que usaste.');return;}
-    if(estado.jugadores.length>=3){showError('La sala está llena (máx. 3 jugadores).');return;}
+    if(estado.fase!=='lobby'){showError(t('lob_in_progress'));return;}
+    if(estado.jugadores.length>=3){showError(t('lob_full'));return;}
     // agregar jugador
     const slot=estado.jugadores.length;
     MP.mySlot=slot;
     estado.jugadores.push({id:MP.myId,nombre:MP.myName,slot,listo:false,conectado:true});
     estado.ts=Date.now();
     await sbSet(MP.salaId,estado);
+    registrarVisita('multi');
     suscribirSala(()=>showLobbyJugador(estado));
   }catch(e){
-    showError('Error uniéndose: '+e.message);
+    showError(t('lob_err_join')+e.message);
   }
 }
 
@@ -5574,8 +5973,8 @@ function handleEstadoRemoto(estado){
         const cards=shuf.querySelectorAll('.sc');
         const msg=shuf.querySelector('.smsg');
         const sub=shuf.querySelector('.ssub');
-        if(msg)msg.textContent='¡Cortando el mazo!';
-        if(sub)sub.textContent='Repartiendo en un momento...';
+        if(msg)msg.textContent=_lang==='en'?'Cutting the deck!':'¡Cortando el mazo!';
+        if(sub)sub.textContent=_lang==='en'?'Dealing in a moment...':'Repartiendo en un momento...';
         if(cards[0]){cards[0].style.transition='transform .4s';cards[0].style.transform='translateY(-28px)';}
         if(cards[1]){cards[1].style.transition='transform .4s';cards[1].style.transform='translateY(-16px)';}
         sndCut();
@@ -5611,7 +6010,7 @@ function handleEstadoRemoto(estado){
       // invitado: reproducir animación
       animateDeal(seq,()=>{
         S.phase='first_discard';
-        S.msg='Esperando al primer jugador...';
+        S.msg=t('msg_waiting_p1');
         redraw();
       });
     }
@@ -5643,12 +6042,12 @@ function handleEstadoRemoto(estado){
       S.phase='shuffle';
       redraw();
       const gp=S.golpBy;
-      const msg=gp===0?'¡Declaraste GOLPEADO!':'¡'+PNAME(gp)+' declaró GOLPEADO!';
+      const msg=_lang==='en'?(gp===0?'You declared GOLPEADO!':PNAME(gp)+' declared GOLPEADO!'):(gp===0?'¡Declaraste GOLPEADO!':'¡'+PNAME(gp)+' declaró GOLPEADO!');
       showGolpeAnimation(msg,()=>{
         S.phase=savedPhase;
         setTimeout(()=>{
           if(S._revPid===0&&S.phase==='golpeado_reveal'){
-            S.msg='Tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.';
+            S.msg=t('msg_your_reveal');
           }
           redraw();
         },600);
@@ -5944,14 +6343,13 @@ function buildLobbyUI(estado,isHost){
           confirmarDiv.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.85);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:900;padding:24px;text-align:center';
           confirmarDiv.innerHTML=`
             <div style="font-size:28px">💰</div>
-            <div style="font-family:Cinzel,serif;font-size:14px;color:var(--gold)">¿Sin apuesta?</div>
+            <div style="font-family:Cinzel,serif;font-size:14px;color:var(--gold)">${_lang==='en'?'No bet?':'¿Sin apuesta?'}</div>
             <div style="font-size:11px;color:rgba(232,220,200,.7);line-height:1.6">
-              No seleccionaste ninguna ficha.<br>
-              ¿Querés jugar sin apuesta o volver a elegir?
+              ${_lang==='en'?'You didn\'t select any chip.<br>Play without a bet or go back to choose?':'No seleccionaste ninguna ficha.<br>¿Querés jugar sin apuesta o volver a elegir?'}
             </div>
             <div style="display:flex;gap:10px;width:100%;max-width:260px">
-              <button id="BC_VOLVER" style="flex:1;padding:10px;border-radius:7px;border:1.5px solid rgba(201,168,76,.5);background:transparent;color:var(--gold);font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation">← Elegir apuesta</button>
-              <button id="BC_SINBET" style="flex:1;padding:10px;border-radius:7px;border:none;background:rgba(232,220,200,.15);color:rgba(232,220,200,.7);font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation">Jugar sin apuesta</button>
+              <button id="BC_VOLVER" style="flex:1;padding:10px;border-radius:7px;border:1.5px solid rgba(201,168,76,.5);background:transparent;color:var(--gold);font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation">${_lang==='en'?'← Choose bet':'← Elegir apuesta'}</button>
+              <button id="BC_SINBET" style="flex:1;padding:10px;border-radius:7px;border:none;background:rgba(232,220,200,.15);color:rgba(232,220,200,.7);font-family:Cinzel,serif;font-size:10px;font-weight:700;cursor:pointer;touch-action:manipulation">${_lang==='en'?'Play without bet':'Jugar sin apuesta'}</button>
             </div>`;
           $('LOBBY_OV').appendChild(confirmarDiv);
           const tap2=(btn,fn)=>{btn.addEventListener('click',fn);btn.addEventListener('touchend',e=>{e.preventDefault();fn();},{passive:false});};
@@ -6073,7 +6471,7 @@ async function iniciarPartidaMulti(estadoLobby){
     deck:[],disc:[],hands:Array.from({length:np},()=>[]),
     shown:Array.from({length:np},()=>[]),
     sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,
-    msg:'Barajando las cartas...',comboThisTurn:false,
+    msg:t('msg_shuffling'),comboThisTurn:false,
     _revOrd:null,_revIdx:0,_revPid:-1,_revSel:[],
     _fitTarget:null,_fitCandidates:null,ts:Date.now()
   };
@@ -6104,7 +6502,7 @@ async function iniciarPartidaMulti(estadoLobby){
       hands:Array.from({length:np},()=>[]),
       shown:Array.from({length:np},()=>[]),
       sel:[],cur:0,phase:'dealing',dealSeq:seq,
-      over:false,golpBy:-1,msg:'Repartiendo...',comboThisTurn:false,
+      over:false,golpBy:-1,msg:t('msg_dealing'),comboThisTurn:false,
       _revOrd:null,_revIdx:0,_revPid:-1,_revSel:[],
       _fitTarget:null,_fitCandidates:null,ts:Date.now()
     };
@@ -6117,7 +6515,7 @@ async function iniciarPartidaMulti(estadoLobby){
       S.phase='dealing';
       animateDeal(seq,()=>{
         S.phase='first_discard';
-        S.msg='Primer turno: seleccioná 1 carta para descartar y comenzar.';
+        S.msg=t('msg_first_turn');
         S.cur=0;S.over=false;S.golpBy=-1;S.sel=[];S.comboThisTurn=false;
         S._revOrd=null;S._revIdx=0;S._revPid=-1;S._revSel=new Set();
         S._fitTarget=null;S._fitCandidates=null;
@@ -6132,12 +6530,12 @@ async function iniciarPartidaMulti(estadoLobby){
 function showShufOvGuest(){
   rmEl('SHUF');rmEl('CUE_OV');rmEl('HTP_OV');
   const ov=document.createElement('div');ov.id='SHUF';ov.className='shov';
-  ov.innerHTML=`<p class="smsg">Barajando las cartas...</p>
+  ov.innerHTML=`<p class="smsg">${t('msg_shuffling')}</p>
     <div class="shdeck" id="SDK">
       <div class="sc" style="top:7px;left:17px"></div>
       <div class="sc" style="top:3px;left:17px"></div>
       <div class="sc" style="top:0;left:17px"></div>
-    </div><p class="ssub">El host está cortando el mazo...</p>`;
+    </div><p class="ssub">${_lang==='en'?'Host is cutting the deck...':'El host está cortando el mazo...'}</p>`;
   $('G').appendChild(ov);
   const cards=ov.querySelectorAll('.sc');
   let n=0,running=true;
@@ -6157,18 +6555,18 @@ function showShufOvMulti(onCut){
   rmEl('SHUF');
   const ov=document.createElement('div');ov.id='SHUF';
   ov.className='shov';
-  ov.innerHTML=`<p class="smsg">Barajando las cartas...</p>
+  ov.innerHTML=`<p class="smsg">${t('msg_shuffling')}</p>
     <div class="shdeck" id="SDK">
       <div class="sc" style="top:7px;left:17px"></div>
       <div class="sc" style="top:3px;left:17px"></div>
       <div class="sc" style="top:0;left:17px"></div>
-    </div><p class="ssub">aguarda...</p>`;
+    </div><p class="ssub">${_lang==='en'?'wait...':'aguarda...'}</p>`;
   $('G').appendChild(ov);
   const cards=ov.querySelectorAll('.sc');
   let n=0;
   function step(){
     if(n>=5){
-      ov.querySelector('.smsg').textContent='¡Listo! Cortá el mazo.';
+      ov.querySelector('.smsg').textContent=_lang==='en'?'Ready! Cut the deck.':'¡Listo! Cortá el mazo.';
       ov.querySelector('.ssub').textContent='';
       let cortado=false;
       const doCut=()=>{
@@ -6185,7 +6583,7 @@ function showShufOvMulti(onCut){
         setTimeout(()=>{ov.remove();onCut();},600);
       };
       const btn=document.createElement('button');
-      btn.className='cbtn';btn.textContent='✂ Cortar el mazo';
+      btn.className='cbtn';btn.textContent=_lang==='en'?'✂ Cut the deck':'✂ Cortar el mazo';
       btn.onclick=doCut;
       btn.addEventListener('touchend',e=>{e.preventDefault();doCut();},{passive:false});
       ov.appendChild(btn);
@@ -6279,22 +6677,21 @@ function aplicarEstadoRemoto(estado){
     if(S.cur===0){
       const miNomAp=MP.myName||'Tú';
       const eraOtroTurno=S.msg&&!S.msg.startsWith(miNomAp);
-      S.msg=`${miNomAp}: ¡GOLPEADO! · tomar descarte · tomar del mazo.`;
+      S.msg=t('msg_your_turn');
       // Solo notificar y arrancar reminder si cambió de turno
       if(eraOtroTurno){notificarMiTurno();startTurnReminder();}
     } else {
-      S.msg='Turno de '+PNAME(S.cur)+'...';
+      S.msg=_lang==='en'?`${PNAME(S.cur)}'s turn...`:'Turno de '+PNAME(S.cur)+'...';
       clearTurnReminder();
     }
   } else if(S.phase==='golpeado_reveal'){
     if(S._revPid===0){
-      const miNomR=MP.myName||'Tú';
-      S.msg=`${miNomR}: tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.`;
+      S.msg=t('msg_your_reveal');
     }
-    else if(S._revPid>0) S.msg=PNAME(S._revPid)+' está mostrando su juego...';
+    else if(S._revPid>0) S.msg=t('msg_other_reveal',PNAME(S._revPid));
     else S.msg=estado.msg||'';
   } else if(S.phase==='mesa_final'){
-    S.msg='¡Todos mostraron su juego! Presioná Ver resultados.';
+    S.msg=t('msg_all_shown');
   } else {
     S.msg=estado.msg||'';
   }
@@ -6329,7 +6726,7 @@ function aplicarEstadoRemoto(estado){
   if(MP.mode==='multi'&&S.phase==='golpeado_reveal'){
     const esMiTurno=S._revPid===0;
     if(esMiTurno&&!S.over){
-      S.msg='Tu turno de mostrar — seleccioná tus cartas para bajar combos o encajar.';
+      S.msg=t('msg_your_reveal');
       redraw();
       // arrancar timer solo si no está ya corriendo (evitar reinicio en cada poll)
       if(getRevTimerSec()===0){
