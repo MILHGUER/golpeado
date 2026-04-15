@@ -4522,13 +4522,21 @@ window.addEventListener('resize',fixIOSHeight);
 window.addEventListener('orientationchange',()=>setTimeout(fixIOSHeight,200));
 
 // 2. Desbloquear AudioContext con primer toque (iOS requiere gesto del usuario)
+let _audioUnlocked=false;
 function unlockAudio(){
+  if(_audioUnlocked)return;
+  _audioUnlocked=true;
+  // Desbloquear Web Audio API (AudioContext)
   try{
     const ctx=getCtx();
     if(ctx.state==='suspended')ctx.resume();
   }catch(e){}
-  document.removeEventListener('touchstart',unlockAudio);
-  document.removeEventListener('click',unlockAudio);
+  // Desbloquear new Audio() — reproducir silencio para que el navegador permita audio posterior
+  try{
+    const a=new Audio(PAGE_SND);
+    a.volume=0;
+    a.play().catch(()=>{});
+  }catch(e){}
 }
 document.addEventListener('touchstart',unlockAudio,{once:true,passive:true});
 document.addEventListener('click',unlockAudio,{once:true});
@@ -4935,6 +4943,10 @@ async function rankingCalifica(racha){
       const miEntrada=top.find(r=>r.nombre===miNombre);
       if(miEntrada&&racha>miEntrada.racha)return true; // actualizar su propio récord
     }
+
+    // Si ya hay 2 o más personas con exactamente esa misma racha → no califica
+    const conMismaRacha=top.filter(r=>r.racha===racha).length;
+    if(conMismaRacha>=2)return false;
 
     // Califica si supera al ÚLTIMO del top 10 (o si hay menos de 10 entradas)
     if(top.length<10)return racha>top[top.length-1].racha||racha>=2;
