@@ -2232,7 +2232,7 @@ function showShufOv(){
   const rawDeck=shuf(makeDeck());
   let n=0;const cards=ov.querySelectorAll('.sc');
   function step(){
-    if(n>=5){ov.querySelector('.smsg').textContent='¡Listo! Corta el mazo.';ov.querySelector('.ssub').textContent='';const btn=document.createElement('button');btn.className='cbtn';btn.textContent='✂ Cortar el mazo';btn.onclick=()=>doCut(ov,rawDeck);ov.appendChild(btn);return;}
+    if(n>=5){ov.querySelector('.smsg').textContent='¡Listo! Corta el mazo.';ov.querySelector('.ssub').textContent='';const btn=document.createElement('button');btn.className='cbtn';btn.textContent='✂ Cortar el mazo';btn.onclick=()=>doCut(ov,rawDeck);btn.addEventListener('touchend',e=>{e.preventDefault();doCut(ov,rawDeck);},{passive:false});ov.appendChild(btn);const sdk=ov.querySelector('#SDK');if(sdk){sdk.style.cursor='pointer';sdk.onclick=()=>doCut(ov,rawDeck);sdk.addEventListener('touchend',e=>{e.preventDefault();doCut(ov,rawDeck);},{passive:false});}return;}
     cards[0].classList.add('sa1');cards[2].classList.add('sa2');
     sndShuffle(); // sonido de barajado
     setTimeout(()=>{cards[0].classList.remove('sa1');cards[2].classList.remove('sa2');n++;setTimeout(step,130);},500);
@@ -2240,6 +2240,7 @@ function showShufOv(){
   setTimeout(step,250);
 }
 function doCut(ov,rawDeck){
+  if(ov._cortado)return;ov._cortado=true;
   ov.querySelector('.cbtn')?.remove();ov.querySelector('.smsg').textContent='Cortando...';
   sndCut(); // sonido de corte
   const cs=ov.querySelectorAll('.sc');
@@ -5994,9 +5995,9 @@ function showShufOvMulti(onCut){
     if(n>=5){
       ov.querySelector('.smsg').textContent='¡Listo! Cortá el mazo.';
       ov.querySelector('.ssub').textContent='';
-      const btn=document.createElement('button');
-      btn.className='cbtn';btn.textContent='✂ Cortar el mazo';
-      btn.onclick=()=>{
+      let cortado=false;
+      const doCut=()=>{
+        if(cortado)return;cortado=true;
         sndCut();
         cards[0].style.transition='transform .4s';cards[0].style.transform='translateY(-28px)';
         cards[1].style.transition='transform .4s';cards[1].style.transform='translateY(-16px)';
@@ -6008,8 +6009,19 @@ function showShufOvMulti(onCut){
         }
         setTimeout(()=>{ov.remove();onCut();},600);
       };
-      btn.addEventListener('touchend',e=>{e.preventDefault();btn.onclick();},{passive:false});
-      ov.appendChild(btn);return;
+      const btn=document.createElement('button');
+      btn.className='cbtn';btn.textContent='✂ Cortar el mazo';
+      btn.onclick=doCut;
+      btn.addEventListener('touchend',e=>{e.preventDefault();doCut();},{passive:false});
+      ov.appendChild(btn);
+      // también el mazo es tappeable
+      const sdk=ov.querySelector('#SDK');
+      if(sdk){
+        sdk.style.cursor='pointer';
+        sdk.onclick=doCut;
+        sdk.addEventListener('touchend',e=>{e.preventDefault();doCut();},{passive:false});
+      }
+      return;
     }
     cards[0].classList.add('sa1');cards[2].classList.add('sa2');
     sndShuffle();
