@@ -1257,6 +1257,152 @@ function historialFechaLabel(fechaStr){
   }catch(e){return fechaStr||'';}
 }
 
+// Calcula cuánto tiempo le queda a un registro antes de ser eliminado (retención: 6 meses)
+function tiempoRestanteLabel(fechaStr){
+  try{
+    const expira=new Date(fechaStr);
+    expira.setMonth(expira.getMonth()+6);
+    const ms=expira-Date.now();
+    if(ms<=0)return{texto:'⚠️ En proceso de eliminación',urgente:true};
+    const dias=Math.floor(ms/(1000*60*60*24));
+    if(dias<=7)return{texto:`⚠️ Se elimina en ${dias} día${dias!==1?'s':''}`,urgente:true};
+    if(dias<=30)return{texto:`⏳ Se elimina en ${dias} días`,urgente:false};
+    const meses=Math.round(dias/30);
+    return{texto:`🗓 Se conserva ${meses} mes${meses!==1?'es':''} más`,urgente:false};
+  }catch(e){return{texto:'',urgente:false};}
+}
+
+// Elimina registros de historial y salas con más de 6 meses de antigüedad
+async function limpiarDatosAntiguos(){
+  try{
+    const corte=new Date();
+    corte.setMonth(corte.getMonth()-6);
+    const cutoff=corte.toISOString();
+    await sbFetchMinimal('/rest/v1/historial?fecha=lt.'+encodeURIComponent(cutoff),'DELETE');
+    console.log('[CLEANUP] Historial antiguo eliminado (corte:',cutoff,')');
+  }catch(e){
+    console.log('[CLEANUP] historial:',e.message);
+  }
+  try{
+    const corte=new Date();
+    corte.setMonth(corte.getMonth()-6);
+    const cutoff=corte.toISOString();
+    await sbFetchMinimal('/rest/v1/salas?created_at=lt.'+encodeURIComponent(cutoff),'DELETE');
+    console.log('[CLEANUP] Salas antiguas eliminadas');
+  }catch(e){
+    console.log('[CLEANUP] salas:',e.message);
+  }
+  try{
+    const corte=new Date(Date.now()-2*3600000).toISOString();
+    await sbFetchMinimal('/rest/v1/sesiones?tipo=eq.solo&created_at=lt.'+encodeURIComponent(corte),'DELETE');
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════════════════
+// LÍMITES DE CAPACIDAD SIMULTÁNEA
+// ══════════════════════════════════════════════════════
+// Requiere tabla en Supabase (ejecutar una sola vez en SQL Editor):
+//   CREATE TABLE IF NOT EXISTS sesiones (
+//     id TEXT PRIMARY KEY,
+//     tipo TEXT NOT NULL,
+//     created_at TIMESTAMPTZ DEFAULT NOW()
+//   );
+//   CREATE INDEX IF NOT EXISTS sesiones_tipo_idx ON sesiones (tipo, created_at);
+//   ALTER TABLE sesiones ENABLE ROW LEVEL SECURITY;
+//   CREATE POLICY "allow_all" ON sesiones FOR ALL USING (true) WITH CHECK (true);
+
+const LIMITE_SOLO=100;
+const LIMITE_MULTI=50;
+const SOLO_TTL_MS=2*3600000;
+const MULTI_VENTANA_MS=3*3600000;
+
+let _sesionSoloId=null;
+
+async function verificarLimiteSolo(){
+  try{
+    const corte=new Date(Date.now()-SOLO_TTL_MS).toISOString();
+    await sbFetchMinimal('/rest/v1/sesiones?tipo=eq.solo&created_at=lt.'+encodeURIComponent(corte),'DELETE');
+    const rows=await sbFetch('/rest/v1/sesiones?tipo=eq.solo&select=id');
+    return(rows?rows.length:0)<LIMITE_SOLO;
+  }catch(e){
+    console.log('[LIMITE] verificarLimiteSolo:',e.message);
+    return true;
+  }
+}
+
+async function registrarSesionSolo(){
+  try{
+    _sesionSoloId='S'+Math.random().toString(36).slice(2,18).toUpperCase();
+    await sbFetchMinimal('/rest/v1/sesiones','POST',{id:_sesionSoloId,tipo:'solo'});
+  }catch(e){
+    console.log('[LIMITE] registrarSesionSolo:',e.message);
+    _sesionSoloId=null;
+  }
+}
+
+async function eliminarSesionSolo(){
+  if(!_sesionSoloId)return;
+  const sid=_sesionSoloId;
+  _sesionSoloId=null;
+  try{await sbFetchMinimal('/rest/v1/sesiones?id=eq.'+sid,'DELETE');}catch(e){}
+}
+
+async function verificarLimiteMulti(){
+  try{
+    const corte=new Date(Date.now()-MULTI_VENTANA_MS).toISOString();
+    const rows=await sbFetch('/rest/v1/salas?created_at=gt.'+encodeURIComponent(corte)+'&select=id');
+    return(rows?rows.length:0)<LIMITE_MULTI;
+  }catch(e){
+    console.log('[LIMITE] verificarLimiteMulti:',e.message);
+    return true;
+  }
+}
+
+let _sllCountdown=null;
+
+function showServidorLleno(tipo,onReintentar){
+  rmEl('SERVIDOR_LLENO_OV');
+  if(_sllCountdown){clearInterval(_sllCountdown);_sllCountdown=null;}
+  const ov=document.createElement('div');
+  ov.id='SERVIDOR_LLENO_OV';
+  ov.style.cssText='position:absolute;inset:0;background:rgba(5,5,15,.98);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:810;padding:28px;text-align:center';
+  const esSolo=tipo==='solo';
+  const limite=esSolo?LIMITE_SOLO:LIMITE_MULTI;
+  const tipoLabel=esSolo?'partidas con bots':'salas multijugador';
+  const icono=esSolo?'🤖':'🌐';
+  const detalle=esSolo
+    ?`Hay ${limite} partidas locales activas en este momento.`
+    :`Hay ${limite} salas online activas en este momento.`;
+  ov.innerHTML=`
+    <div style="font-size:54px;line-height:1;filter:grayscale(.3)">${icono}</div>
+    <div style="font-family:Cinzel,serif;font-size:20px;font-weight:700;color:#E24B4A;letter-spacing:.07em;text-shadow:0 0 20px rgba(226,75,74,.5)">SERVIDOR LLENO</div>
+    <div style="font-size:11px;color:rgba(232,220,200,.75);max-width:230px;line-height:1.8">
+      Se alcanzó el límite de<br><strong style="color:var(--gold);font-size:13px">${limite} ${tipoLabel}</strong><br>simultáneas.
+    </div>
+    <div style="font-size:10px;color:rgba(232,220,200,.35);max-width:230px;line-height:1.6">${detalle}<br>Volvé en unos minutos e intentá de nuevo.</div>
+    <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 18px;font-family:Cinzel,serif;font-size:10px;color:rgba(232,220,200,.45)">
+      ⏱ Reintentando automáticamente en <span id="SLL_SEGS" style="color:var(--gold);font-weight:700">30</span>s
+    </div>
+    <div style="display:flex;gap:10px;width:100%;max-width:260px">
+      <button id="SLL_BACK" style="flex:1;padding:11px;border-radius:7px;border:1.5px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:11px;cursor:pointer;touch-action:manipulation">← Volver</button>
+      <button id="SLL_RETRY" style="flex:2;padding:11px;border-radius:7px;border:none;background:var(--gold);color:#1a1230;font-family:Cinzel,serif;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;box-shadow:0 3px 12px rgba(201,168,76,.4)">🔄 Reintentar</button>
+    </div>
+  `;
+  $('G').appendChild(ov);
+  const tap=(el,fn)=>{el.addEventListener('click',fn);el.addEventListener('touchend',e=>{e.preventDefault();fn();},{passive:false});};
+  const segsEl=ov.querySelector('#SLL_SEGS');
+  const doRetry=()=>{if(_sllCountdown){clearInterval(_sllCountdown);_sllCountdown=null;}ov.remove();onReintentar();};
+  const doBack=()=>{if(_sllCountdown){clearInterval(_sllCountdown);_sllCountdown=null;}ov.remove();showModeScreen();};
+  tap(ov.querySelector('#SLL_BACK'),doBack);
+  tap(ov.querySelector('#SLL_RETRY'),doRetry);
+  let segs=30;
+  _sllCountdown=setInterval(()=>{
+    segs--;
+    if(segsEl)segsEl.textContent=segs;
+    if(segs<=0)doRetry();
+  },1000);
+}
+
 function mkHistorialCard(row){
   const d=row.datos;
   if(!d)return null;
@@ -1285,6 +1431,8 @@ function mkHistorialCard(row){
     gananciaText='Sin apuesta';
   }
 
+  const tr=tiempoRestanteLabel(row.fecha);
+  const trColor=tr.urgente?'rgba(226,75,74,.75)':'rgba(232,220,200,.25)';
   div.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
       <span style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:${ganadorColor}">${ganadorText}</span>
@@ -1292,6 +1440,7 @@ function mkHistorialCard(row){
     </div>
     <div style="font-size:9px;color:rgba(232,220,200,.6);line-height:1.6;margin-bottom:3px">${jugLista}</div>
     <div style="font-size:8px;color:rgba(201,168,76,.6)">${gananciaText}</div>
+    ${tr.texto?`<div style="font-size:8px;color:${trColor};margin-top:3px">${tr.texto}</div>`:''}
     <div style="font-size:8px;color:rgba(74,158,232,.5);margin-top:3px;text-align:right">👆 Toca para ver la mesa</div>
   `;
   div.addEventListener('click',()=>showHistorialMesa(row));
@@ -1342,6 +1491,7 @@ function showHistorialMesa(row){
       <div style="flex:1">
         <div style="font-family:Cinzel,serif;font-size:10px;color:rgba(201,168,76,.85);font-weight:700;letter-spacing:.05em">PARTIDA HISTÓRICA — SALA ${d.sala_id||''}</div>
         <div style="font-size:8px;color:rgba(232,220,200,.35)">${historialFechaLabel(row.fecha)}</div>
+        ${(()=>{const tr=tiempoRestanteLabel(row.fecha);return tr.texto?`<div style="font-size:8px;color:${tr.urgente?'rgba(226,75,74,.8)':'rgba(232,220,200,.3)'};margin-top:1px">${tr.texto}</div>`:''})()}
       </div>
       <button id="HIST_MESA_CLO" style="background:rgba(226,75,74,.2);border:1.5px solid rgba(226,75,74,.6);border-radius:6px;color:#E24B4A;font-size:11px;font-weight:700;padding:6px 14px;cursor:pointer;font-family:Cinzel,serif;touch-action:manipulation">✕ Cerrar</button>
     </div>
@@ -1484,6 +1634,7 @@ async function showHistorialOv(salaIdInicial=''){
     <div style="padding:10px 12px;border-bottom:1px solid rgba(232,220,200,.08);flex-shrink:0">
       <input id="HIST_SEARCH" placeholder="CÓDIGO DE SALA (ej: AB12CD)" maxlength="8" value="${salaIdInicial.toUpperCase()}">
       <button id="HIST_BUSCAR" style="width:100%;margin-top:7px;padding:8px;border-radius:7px;border:1.5px solid rgba(201,168,76,.5);background:transparent;color:var(--gold);font-family:Cinzel,serif;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation">🔍 Buscar partidas</button>
+      <div style="margin-top:6px;padding:6px 8px;border-radius:6px;background:rgba(232,220,200,.05);border:1px solid rgba(232,220,200,.1);font-size:8px;color:rgba(232,220,200,.4);line-height:1.5;font-family:Cinzel,serif;letter-spacing:.02em">🗓 Las partidas se guardan por <strong style="color:rgba(232,220,200,.6)">6 meses</strong> y luego se eliminan automáticamente. Cada partida muestra cuánto tiempo le queda.</div>
     </div>
     <div class="hist-body" id="HIST_BODY">
       <div style="text-align:center;color:rgba(232,220,200,.3);font-size:11px;padding:30px 0">
@@ -1509,7 +1660,7 @@ async function showHistorialOv(salaIdInicial=''){
     const rows=await historialCargar(sala);
     body.innerHTML='';
     if(!rows.length){
-      body.innerHTML='<div style="text-align:center;color:rgba(232,220,200,.3);font-size:11px;padding:30px 0">No hay partidas registradas para esta sala</div>';
+      body.innerHTML='<div style="text-align:center;color:rgba(232,220,200,.3);font-size:11px;padding:30px 0">No hay partidas registradas para esta sala<div style="font-size:9px;margin-top:8px;color:rgba(232,220,200,.2)">Las partidas se guardan por 6 meses. Es posible que las partidas de esta sala ya hayan sido eliminadas.</div></div>';
       return;
     }
     const titulo=document.createElement('div');
@@ -4775,6 +4926,7 @@ function checkFirstVisit(onDone){
 }
 
 function showModeScreen(){
+  eliminarSesionSolo(); // liberar sesión solo si venimos de una partida
   // si viene con ?sala= en la URL → ir directo a pantalla de nombre
   const urlSala=getSalaParam();
   if(urlSala){
@@ -4815,7 +4967,14 @@ function showModeScreen(){
   const unir=ov.querySelector('#MS_UNIR');
   const tap=(btn,fn)=>{btn.addEventListener('click',fn);btn.addEventListener('touchend',e=>{e.preventDefault();fn();},{passive:false});};
   const htp=ov.querySelector('#MS_HTP');if(htp)tap(htp,()=>showHowToPlay());
-  tap(solo,()=>{MP.mode='solo';rmEl('MODE_OV');startGame();});
+  tap(solo,async()=>{
+    solo.disabled=true;solo.style.opacity='.6';solo.textContent='⏳ Verificando...';
+    const libre=await verificarLimiteSolo();
+    if(!libre){solo.disabled=false;solo.style.opacity='';solo.textContent='🤖 Jugar con Bots';showServidorLleno('solo',()=>showModeScreen());return;}
+    MP.mode='solo';rmEl('MODE_OV');
+    registrarSesionSolo();
+    startGame();
+  });
 
   tap(crear,()=>showNombreScreen('crear'));
   tap(unir,()=>showNombreScreen('unir'));
@@ -5284,6 +5443,9 @@ async function sbCreate(salaId,estado){
 
 // ── CREAR SALA ──
 async function crearSala(){
+  showLobbyLoading('Verificando disponibilidad...');
+  const libre=await verificarLimiteMulti();
+  if(!libre){rmEl('LOBBY_OV');showServidorLleno('multi',()=>crearSala());return;}
   showLobbyLoading('Creando sala...');
   const estado={
     fase:'lobby',
@@ -6675,6 +6837,21 @@ function getVoiceIndicator(slotLocal){
   if(isActive||hasRemoteVoice)return '🎙️';
   return '';
 }
+
+// ── LIMPIEZA AUTOMÁTICA AL INICIAR ──
+setTimeout(()=>limpiarDatosAntiguos(),2000);
+
+// Liberar sesión solo al cerrar pestaña
+window.addEventListener('beforeunload',()=>{
+  if(!_sesionSoloId)return;
+  try{
+    fetch(SB_URL+'/rest/v1/sesiones?id=eq.'+_sesionSoloId,{
+      method:'DELETE',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
+      keepalive:true
+    });
+  }catch(e){}
+});
 
 </script>
 </body>
