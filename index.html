@@ -3734,8 +3734,8 @@ function drawHand(){
       ce.style.borderRadius='6px';
       // Mensaje dentro de la carta
       const msg=document.createElement('div');
-      msg.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.6);border-radius:6px;padding:4px;z-index:2;pointer-events:none';
-      msg.innerHTML='<span style="font-family:Cinzel,serif;font-size:8px;color:var(--gold);text-align:center;line-height:1.6;letter-spacing:.03em">Seleccioná<br>2+ cartas<br>de tu mano<br>para combo<br><span style="color:rgba(226,75,74,.9)">↩ o devolvé</span></span>';
+      msg.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.75);border-radius:6px;padding:4px;z-index:2;pointer-events:none';
+      msg.innerHTML='<span style="font-family:Cinzel,serif;font-size:8px;color:#fff;text-align:center;line-height:1.6;letter-spacing:.03em;text-shadow:0 1px 3px rgba(0,0,0,.9)">Seleccioná<br>2+ cartas<br>de tu mano<br>para combo<br><span style="color:#E24B4A;font-weight:700">↩ o devolvé</span></span>';
       ce.appendChild(msg);
       dtDiv.appendChild(ce);
     } else {
