@@ -5281,6 +5281,21 @@ function handleEstadoRemoto(estado){
     rmEl('LOBBY_OV');rmEl('SHUF');
     aplicarEstadoRemoto(estado);
     if(S.phase==='mesa_final'){
+      // Calcular pagos y guardar historial si no se hizo en revealNext
+      if(!S._pagoProcessed){
+        const sc=S.hands.map(h=>h.reduce((a,c)=>a+cv(c),0));
+        const ad=sc.map((s,i)=>s+(usedBothWilds(i)?60:0));
+        const mn=Math.min(...ad);
+        const wn=ad.map((s,i)=>s===mn?i:-1).filter(i=>i>=0);
+        const ti=wn.length>1;
+        const gp=S.golpBy;
+        calcPayments(wn,ad,ti,gp,gp>=0&&ad[gp]===mn&&!ti);
+      }
+      if(!S._historialGuardado){
+        S._historialGuardado=true;
+        console.log('[HIST] Guardando desde mesa_final remoto. isHost:',MP.isHost);
+        historialGuardar().then(()=>console.log('[HIST] OK')).catch(e=>console.log('[HIST] ERR:',e));
+      }
       // Iniciar countdown si no está ya corriendo
       if(!_verResCountdown&&(S._verResSegs===undefined||S._verResSegs>0)){
         if(S._verResSegs===undefined||S._verResSegs===0)S._verResSegs=10;
