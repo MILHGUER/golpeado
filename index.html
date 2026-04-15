@@ -85,6 +85,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 .card.jkcard .cc,.card.wlcard .cc{position:absolute;inset:0;z-index:0}
 .card.jkcard .cc img,.card.wlcard .cc img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
 .card.jkcard .cn,.card.wlcard .cn{position:relative;z-index:2;line-height:14px;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.8)}
+.card.jkcard .cn .cns,.card.wlcard .cn .cns{display:none}
+.card.jkcard .cn.b,.card.wlcard .cn.b{display:none}
 .card.sel{transform:translateY(-10px);box-shadow:0 0 0 2px var(--gold),0 8px 18px rgba(0,0,0,.45)}
 .card.back{background:#1a1230;border-color:#333;cursor:default}
 .card.back:hover,.card.back:active{transform:none;box-shadow:none}
@@ -3466,7 +3468,7 @@ function showConfirmListo(pts){
 }
 
 // RENDER
-function redraw(){drawBots();drawCenter();drawHand();drawHUD();drawActs();drawVoiceUI();}
+function redraw(){document.querySelectorAll('#JK_GHOST').forEach(g=>g.remove());drawBots();drawCenter();drawHand();drawHUD();drawActs();drawVoiceUI();}
 
 function mkBack(){const e=document.createElement('div');e.className='card back';e.innerHTML='<div style="grid-row:1/-1;overflow:hidden"><div class="cbk" style="height:100%"></div></div>';return e;}
 
@@ -3801,7 +3803,7 @@ function drawCenter(){
             if(!jGhost&&(Math.abs(cx-jtx)>6||Math.abs(cy-jty)>6)){
               const cw0=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cw'));
               const ch0=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ch'));
-              jGhost=document.createElement('div');jGhost.className=`card ${c.c}`;
+              jGhost=document.createElement('div');jGhost.className=`card ${c.c}`;jGhost.id='JK_GHOST';
               jGhost.innerHTML=`<div class="cn"><span class="cnn">${dispN(c)}</span><span class="cns">${c.s}</span></div><div class="cc">${cardInner(c)}</div><div class="cn b"><span class="cnn">${dispN(c)}</span><span class="cns">${c.s}</span></div>`;
               jGhost.style.cssText=`position:fixed;z-index:600;pointer-events:none;opacity:.85;transform:scale(1.15) rotate(5deg);transition:none;box-shadow:0 8px 24px rgba(0,0,0,.6);top:${cy-ch0/2}px;left:${cx-cw0/2}px`;
               document.body.appendChild(jGhost);ce.style.opacity='.3';
@@ -3823,6 +3825,10 @@ function drawCenter(){
             if(tg){
               tryJokerMove(combo,cardIdx,parseInt(tg.dataset.jdrop));
             }
+          },{passive:true});
+          ce.addEventListener('touchcancel',()=>{
+            if(jGhost){jGhost.remove();jGhost=null;ce.style.opacity='';}
+            document.querySelectorAll('.jdrop').forEach(x=>x.classList.remove('jdrop'));
           },{passive:true});
         }
         // Si el Joker está en el medio, no es draggable pero mostrar tooltip
@@ -4208,10 +4214,8 @@ function drawActs(){
         </div>
       </div>`;
     }
-    // Auto-listo: solo cuando el botón está activo (sin sobrantes o sin más opciones)
-    // Auto-listo SOLO cuando mano vacía (sin sobrantes) — 8 segundos para confirmar
-    // Con sobrantes el timer de revelación (3 min) maneja el tiempo límite
-    const listoActivo=(!_hh.length);
+    // Auto-listo: mano vacía O sobrantes sin más jugadas válidas — 8 segundos para confirmar
+    const listoActivo=(!_hh.length||!hayMas);
     const autoListoSecs=8;
     if(listoActivo){
       // Mostrar countdown en el label
@@ -4241,7 +4245,7 @@ function drawActs(){
         _autoListoTimer=setTimeout(tick,1000);
       }
     } else {
-      // Hay más opciones — cancelar auto-listo
+      // Todavía hay jugadas válidas — cancelar auto-listo
       if(_autoListoTimer){clearTimeout(_autoListoTimer);_autoListoTimer=null;S._autoListoSegs=undefined;}
     }
     return;
