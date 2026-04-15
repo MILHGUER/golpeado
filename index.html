@@ -342,6 +342,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
       <div class="plbl">Tu mano — toca para seleccionar · arrastra para ordenar <span id="MY_VOICE_IND" style="font-size:13px"></span></div>
       <button id="SORT_BTN" ontouchend="event.preventDefault();sortHand()" onclick="sortHand()" style="font-family:Cinzel,serif;font-size:8px;color:rgba(201,168,76,.6);border:1px solid rgba(201,168,76,.25);background:transparent;border-radius:4px;padding:2px 7px;cursor:pointer;white-space:nowrap;touch-action:manipulation;flex-shrink:0">⇕ Ordenar</button>
     </div>
+    <div id="DISC_TAKEN_DIV" style="display:none;position:absolute;z-index:50;pointer-events:none"></div>
     <div class="hwrap"><div id="PH"></div></div>
     <div id="HAND_GUIDE" style="display:none;padding:4px 8px;border-radius:5px;margin:2px 4px 0"></div>
     <div id="HAND_PTS" style="font-size:10px;text-align:center;min-height:14px;padding:2px 0;font-family:Cinzel,serif"></div>
@@ -2037,7 +2038,7 @@ function startGame(){
   clearTurnReminder();
   hideHandGuide();
   if(_autoListoTimer){clearTimeout(_autoListoTimer);_autoListoTimer=null;S._autoListoSegs=undefined;}
-  Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_verResSegs:0,_rachaProcessed:false,_pagoProcessed:false,_historialGuardado:false});
+  Object.assign(S,{deck:[],disc:[],hands:[[],[],[]],shown:[[],[],[]],sel:[],cur:0,phase:'shuffle',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_verResSegs:0,_rachaProcessed:false,_pagoProcessed:false,_historialGuardado:false,_discTaken:null});
   redraw();
   showBetScreen(); // primero apuesta, luego baraja
 }
@@ -2418,9 +2419,8 @@ function actDraw(){
 
 function actTakeDisc(){
   if(S.over||S.cur!==0||S.phase!=='play'||!S.disc.length)return;
-  // No cancelar el reminder aquí — el turno no terminó todavía
+  clearTurnReminder();
   const top=S.disc[S.disc.length-1];
-  // verificar si puede formar combo ANTES de tomarla
   const hand=S.hands[0];
   let canForm=false;
   outer:for(let i=0;i<hand.length;i++)
@@ -2430,33 +2430,55 @@ function actTakeDisc(){
     S.msg=miNom()+': No podés formar combo con esa carta. Tomá del mazo.';
     drawMsg();drawActs();return;
   }
-  S.disc.pop(); sndDraw(); // quita del pile + sonido
-  top._owner=0; // el jugador 0 toma la carta
-  S.hands[0].push(top);     // agrega a la mano
-  clrSel();S.sel=[top.id];  // pre-selecciona la carta tomada
+  S.disc.pop(); sndDraw();
+  top._owner=0;
+  // Carta queda destacada separada — NO va a la mano todavía
+  S._discTaken=top;
+  clrSel();
   S.comboThisTurn=false;S.phase='took_discard';
-  S.msg=miNom()+': Tomaste el descarte. Seleccioná 3+ cartas (incluyendo la tomada) y mostrá combo.';
+  S.msg=''; // el mensaje va dentro de la carta flotante
   startTurnReminder();
+  hideHandGuide();
   redraw();
-  // Mensaje temporal guía
-  const nomDisc=MP.mode==='multi'?(MP.myName||'Jugador'):'Jugador';
-  const cartaDesc=S.disc.length?'':'la carta tomada';
-  showHandGuide('Seleccioná 3+ cartas incluyendo la carta que tomaste del descarte, luego presioná "Mostrar combinación"','rgba(201,168,76,.9)',false,0);
+  if(MP.mode==='multi')mpPublicarEstado();
 }
 
 function actShowCombo(){
-  const cs=selCards();
+  // Si hay carta tomada del descarte, incluirla en el combo
+  const selBase=selCards();
+  const cs=S._discTaken?[S._discTaken,...selBase]:selBase;
+  const minCartas=S._discTaken?2:3; // con discTaken necesita 2 de la mano (total 3)
+  if(selBase.length<minCartas){
+    S.msg=miNom()+': Seleccioná al menos '+minCartas+' cartas de tu mano para el combo.';
+    drawMsg();drawActs();return;
+  }
   if(cs.length<3){S.msg=miNom()+': Seleccioná al menos 3 cartas.';drawMsg();drawActs();return;}
   if(!validCombo(cs)){S.msg='No forman grupo ni escalera válida.';drawMsg();drawActs();return;}
-  // ── quitar de hand, agregar a shown ──  (NUNCA en los dos al mismo tiempo)
-  const ids=cs.map(c=>c.id);
+  const ids=selBase.map(c=>c.id);
   const _c0={cards:[...cs],type:comboType(cs)};_c0.order=sortCombo(_c0);S.shown[0].push(_c0);
   S.hands[0]=rmIds(S.hands[0],ids);
+  S._discTaken=null; // carta del descarte ya fue usada en el combo
   sndCombo();clrSel();S.comboThisTurn=true;S.phase="showed_combo";mpPublicarEstado();
   S.msg=miNom()+': ¡Combo mostrado! Ahora seleccioná 1 carta que no necesites y presioná Descartar.';
   startTurnReminder();
   redraw();
   showHandGuide('¡Combo en mesa! Ahora seleccioná 1 carta que no necesites y presioná Descartar','rgba(123,232,123,.85)',false,0);
+}
+
+function actDevolverDisc(){
+  // Devolver la carta tomada del descarte a la pila
+  if(!S._discTaken)return;
+  const card=S._discTaken;
+  delete card._owner;
+  S.disc.push(card);
+  S._discTaken=null;
+  S.phase='play'; // volver al estado normal — puede elegir mazo o descarte
+  clrSel();
+  S.msg=miNom()+': Carta devuelta. Podés tomar del mazo o del descarte.';
+  showHandGuide(miNom()+': Podés tomar del mazo o del nuevo descarte','rgba(201,168,76,.7)',false,0);
+  startTurnReminder();
+  redraw();
+  if(MP.mode==='multi')mpPublicarEstado();
 }
 
 function actDiscard(){
@@ -2536,6 +2558,7 @@ function clearTurnReminder(){
 }
 function passTurn(){
   clrSel();S.comboThisTurn=false;
+  if(S._discTaken){S.disc.push(S._discTaken);S._discTaken=null;} // devolver si quedó sin usar
   S.cur=(S.cur+1)%S.np;
   if(S.over)return;
   if(MP.mode==='multi'){
@@ -3161,7 +3184,7 @@ function nuevaPartida(){
     voiceStop(true); // detener voz al volver al lobby (sin publicar estado)
     stopPoll();
     // ── LIMPIAR estado del juego anterior completamente ──
-    Object.assign(S,{deck:[],disc:[],hands:Array.from({length:S.np},()=>[]),shown:Array.from({length:S.np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_rachaProcessed:false,_pagoProcessed:false,_historialGuardado:false});
+    Object.assign(S,{deck:[],disc:[],hands:Array.from({length:S.np},()=>[]),shown:Array.from({length:S.np},()=>[]),sel:[],cur:0,phase:'lobby',over:false,golpBy:-1,msg:'',comboThisTurn:false,dragId:0,_revOrd:null,_revIdx:0,_revPid:-1,_revSel:new Set(),_fitTarget:null,_fitCandidates:null,_voiceActive:{},_voiceSpeaking:{},_rachaProcessed:false,_pagoProcessed:false,_historialGuardado:false,_discTaken:null});
     MP.mySlot=MP.isHost?0:MP.mySlot; // mantener slot
     // publicar estado de lobby para que todos vean la sala de espera
     const lobbyState={
@@ -3670,6 +3693,56 @@ function hideHandGuide(){
 }
 function drawHand(){
   const PH=$('PH');PH.innerHTML='';
+
+  // ── Carta tomada del descarte — flotando sobre la mano sin ocupar espacio ──
+  const dtDiv=$('DISC_TAKEN_DIV');
+  if(dtDiv){
+    dtDiv.innerHTML='';
+    if(S._discTaken&&S.phase==='took_discard'){
+      dtDiv.style.display='block';
+      dtDiv.style.pointerEvents='none';
+      // Posicionar encima de la pila de descarte (DP)
+      const dp=$('DP');
+      const G=$('G');
+      if(dp&&G){
+        const dr=dp.getBoundingClientRect();
+        const gr=G.getBoundingClientRect();
+        const cardW=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cw'))||50;
+        const cardH=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ch'))||74;
+        const scale=1.8;
+        const w=cardW*scale;
+        const h=cardH*scale;
+        dtDiv.style.position='absolute';
+        dtDiv.style.left=(dr.left-gr.left+(dr.width/2)-(w/2))+'px';
+        dtDiv.style.top=(dr.top-gr.top-(h*0.7))+'px';
+        dtDiv.style.width=w+'px';
+        dtDiv.style.zIndex='80';
+      }
+      // Label pequeño
+      const lbl=document.createElement('div');
+      lbl.style.cssText='font-family:Cinzel,serif;font-size:7px;color:var(--gold);text-align:center;letter-spacing:.05em;margin-bottom:2px;text-shadow:0 1px 4px rgba(0,0,0,.8)';
+      lbl.textContent='DESCARTE';
+      dtDiv.appendChild(lbl);
+      // Carta grande con pulso dorado
+      const ce=mkFace(S._discTaken,false);
+      ce.style.width='100%';
+      ce.style.height='auto';
+      ce.style.boxShadow='0 0 0 2px var(--gold), 0 0 16px rgba(201,168,76,.7), 0 4px 12px rgba(0,0,0,.5)';
+      ce.style.animation='deckPulse 1.2s ease-in-out infinite';
+      ce.style.display='block';
+      ce.style.position='relative';
+      ce.style.borderRadius='6px';
+      // Mensaje dentro de la carta
+      const msg=document.createElement('div');
+      msg.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.6);border-radius:6px;padding:4px;z-index:2;pointer-events:none';
+      msg.innerHTML='<span style="font-family:Cinzel,serif;font-size:8px;color:var(--gold);text-align:center;line-height:1.6;letter-spacing:.03em">Seleccioná<br>2+ cartas<br>de tu mano<br>para combo<br><span style="color:rgba(226,75,74,.9)">↩ o devolvé</span></span>';
+      ce.appendChild(msg);
+      dtDiv.appendChild(ce);
+    } else {
+      dtDiv.style.display='none';
+    }
+  }
+
   // Mensaje guía debajo de la mano según fase (nunca bloquea)
   if(S.phase==='play'&&S.cur===0&&!S.over){
     const nom=MP.mode==='multi'?(MP.myName||'Jugador'):'Jugador';
@@ -3977,7 +4050,18 @@ function drawActs(){
       if(cs.length>1&&cs.length<3)h+=`<span class="hint">Selecciona 1 para descartar ó 3+ para combo</span>`;
       break;
     case'took_discard':
-      h=cs.length>=3?`<button class="btn pri" onclick="actShowCombo()">Mostrar combinación</button>`:`<span class="hint">Selecciona mín. 3 cartas (incluye la tomada)</span>`;
+      // Con _discTaken: necesita 2+ cartas de la mano (carta tomada ya está incluida)
+      if(S._discTaken){
+        const puedeCombo=cs.length>=2&&validCombo([S._discTaken,...cs]);
+        h=`<div style="display:flex;gap:6px;width:100%">`;
+        h+=puedeCombo
+          ?`<button class="btn pri" style="flex:2" onclick="actShowCombo()">✅ Mostrar combo</button>`
+          :`<span class="hint" style="flex:2">Seleccioná 2+ cartas de tu mano para el combo</span>`;
+        h+=`<button class="btn" style="flex:1;border-color:rgba(226,75,74,.5);color:#E24B4A" onclick="actDevolverDisc()">↩ Devolver</button>`;
+        h+=`</div>`;
+      } else {
+        h=cs.length>=3?`<button class="btn pri" onclick="actShowCombo()">Mostrar combinación</button>`:`<span class="hint">Selecciona mín. 3 cartas (incluye la tomada)</span>`;
+      }
       break;
     case'showed_combo':
       h=cs.length===1?`<button class="btn pri" onclick="actDiscard()">Descartar</button>`:`<span class="hint">Selecciona 1 carta para descartar</span>`;
@@ -6336,3 +6420,4 @@ function getVoiceIndicator(slotLocal){
 </script>
 </body>
 </html>
+<script_placeholder>
