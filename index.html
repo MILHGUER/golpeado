@@ -1698,10 +1698,24 @@ async function verificarLimiteSolo(){
   }
 }
 
+let _sesionHeartbeat=null;
+
 async function registrarSesionSolo(){
   try{
     _sesionSoloId='S'+Math.random().toString(36).slice(2,18).toUpperCase();
     await sbFetchMinimal('/rest/v1/sesiones','POST',{id:_sesionSoloId,tipo:'solo'});
+    // heartbeat: renovar la sesión cada 3 min para que el dashboard sepa que sigue activa
+    if(_sesionHeartbeat)clearInterval(_sesionHeartbeat);
+    _sesionHeartbeat=setInterval(async()=>{
+      if(!_sesionSoloId)return;
+      const oldId=_sesionSoloId;
+      const newId='S'+Math.random().toString(36).slice(2,18).toUpperCase();
+      try{
+        await sbFetchMinimal('/rest/v1/sesiones','POST',{id:newId,tipo:'solo'});
+        _sesionSoloId=newId;
+        sbFetchMinimal('/rest/v1/sesiones?id=eq.'+oldId,'DELETE').catch(()=>{});
+      }catch(e){}
+    },3*60*1000);
   }catch(e){
     console.log('[LIMITE] registrarSesionSolo:',e.message);
     _sesionSoloId=null;
@@ -1709,6 +1723,7 @@ async function registrarSesionSolo(){
 }
 
 async function eliminarSesionSolo(){
+  if(_sesionHeartbeat){clearInterval(_sesionHeartbeat);_sesionHeartbeat=null;}
   if(!_sesionSoloId)return;
   const sid=_sesionSoloId;
   _sesionSoloId=null;
@@ -5934,6 +5949,7 @@ async function unirseASala(){
 // ── SUSCRIPCIÓN REALTIME ──
 function suscribirSala(onReady){
   if(MP._pollInterval){clearInterval(MP._pollInterval);MP._pollInterval=null;}
+  if(MP._presenceInterval){clearInterval(MP._presenceInterval);MP._presenceInterval=null;}
   let lastTs=0;
   let ready=false; // no procesar hasta que onReady haya corrido
   MP._pollInterval=setInterval(async()=>{
@@ -5949,10 +5965,25 @@ function suscribirSala(onReady){
       }
     }catch(e){}
   },1000);
+  // heartbeat: solo el host actualiza estado.ts cada 3 min para que
+  // el dashboard sepa que la sala sigue activa aunque no haya acciones
+  MP._presenceInterval=setInterval(async()=>{
+    if(!MP.isHost||!MP.salaId)return;
+    try{
+      const row=await sbGet(MP.salaId);
+      if(!row)return;
+      const est=row.estado;
+      est.ts=Date.now();
+      await sbSet(MP.salaId,est);
+    }catch(e){}
+  },3*60*1000);
   if(onReady){onReady();ready=true;}
 }
 
-function stopPoll(){if(MP._pollInterval){clearInterval(MP._pollInterval);MP._pollInterval=null;}}
+function stopPoll(){
+  if(MP._pollInterval){clearInterval(MP._pollInterval);MP._pollInterval=null;}
+  if(MP._presenceInterval){clearInterval(MP._presenceInterval);MP._presenceInterval=null;}
+}
 
 // ── MANEJAR ESTADO REMOTO ──
 function handleEstadoRemoto(estado){
