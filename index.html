@@ -341,11 +341,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
   cursor:pointer;
 }
 #SPLASH_FLASH{
-  position:absolute;inset:0;
-  background:#fff;
-  opacity:0;
-  pointer-events:none;
-  z-index:2;
+  display:none;
+}
+@keyframes splashCardIn{
+  0%{opacity:0;transform:scale(.82) translateY(10px)}
+  100%{opacity:1;transform:scale(1) translateY(0)}
 }
 #SPLASH_CARD{
   position:absolute;inset:0;
@@ -796,7 +796,7 @@ try{
 
     // Secuencia de flashes
     let idx=0;
-    const FLASH_DUR=60; // ms por carta
+    const FLASH_DUR=75; // ms por carta
     function nextFlash(){
       if(idx>=SPLASH_CARDS.length){
         // Mostrar portada
@@ -804,24 +804,19 @@ try{
         playPageSound(0.7);
         img.style.animation='splashPortada .4s cubic-bezier(.175,.885,.32,1.275) forwards';
         img.style.opacity='1';
-        setTimeout(hideSplash,1800);
+        setTimeout(hideSplash,1200);
         return;
       }
-      // Flash blanco
-      flash.style.transition='none';
-      flash.style.opacity='1';
-      // Mostrar carta
+      // Mostrar carta con animación suave
       cardDiv.innerHTML='';
       cardDiv.appendChild(mkSplashCard(SPLASH_CARDS[idx]));
       cardDiv.style.opacity='1';
+      cardDiv.style.animation='none';
+      cardDiv.offsetHeight; // forzar reflow
+      cardDiv.style.animation='splashCardIn 0.07s ease-out forwards';
       // Sonido de hoja
       playPageSound(0.45+idx*0.03);
       sndShuffleSoft();
-      // Apagar flash
-      setTimeout(()=>{
-        flash.style.transition='opacity 0.06s';
-        flash.style.opacity='0';
-      },30);
       idx++;
       setTimeout(nextFlash,FLASH_DUR);
     }
@@ -5243,7 +5238,7 @@ function showHowToPlay(onClose){
     ov.innerHTML=`
       <div style="width:100%;display:flex;flex-direction:column;height:100%">
         <div style="padding:18px 20px 10px;border-bottom:1px solid rgba(201,168,76,.15)">
-          <div style="font-family:Cinzel,serif;font-size:clamp(16px,2.5vw,22px);color:var(--gold);text-align:center;letter-spacing:.08em">🃏 ${_lang==='en'?'How to play':'Cómo se juega'}</div>
+          <div style="font-family:Cinzel,serif;font-size:clamp(16px,2.5vw,22px);color:var(--gold);text-align:center;letter-spacing:.08em;display:flex;align-items:center;justify-content:center;gap:8px"><img src="favicon.ico" style="width:22px;height:22px;object-fit:contain;vertical-align:middle;filter:drop-shadow(0 0 4px rgba(255,255,255,0.8))"> ${_lang==='en'?'How to play':'Cómo se juega'}</div>
         </div>
         <div style="display:flex;gap:0;border-bottom:1px solid rgba(201,168,76,.15);flex-shrink:0">
           ${tabs.map(tb=>`<button id="HTP_TAB_${tb.id}" style="flex:1;padding:8px 4px;background:${tabActivo===tb.id?'rgba(201,168,76,.12)':'transparent'};border:none;border-bottom:3px solid ${tabActivo===tb.id?'var(--gold)':'transparent'};color:${tabActivo===tb.id?'var(--gold)':'rgba(232,220,200,.5)'};font-family:Cinzel,serif;font-size:9px;cursor:pointer;white-space:nowrap;touch-action:manipulation;text-align:center;display:flex;flex-direction:column;align-items:center;gap:1px"><span style="font-size:15px">${tb.short}</span><span style="font-size:8px;opacity:.8">${tabLabel(tb.id)}</span></button>`).join('')}
@@ -5315,7 +5310,7 @@ function showModeScreen(){
   const ov=document.createElement('div');ov.id='MODE_OV';
   ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:800;padding:24px';
   ov.innerHTML=`
-    <div style="font-family:Cinzel,serif;font-size:28px;color:var(--gold);letter-spacing:.12em;text-align:center">🃏 GOLPEADO</div>
+    <div style="font-family:Cinzel,serif;font-size:28px;color:var(--gold);letter-spacing:.12em;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px"><img src="favicon.ico" style="width:32px;height:32px;object-fit:contain;vertical-align:middle;filter:drop-shadow(0 0 4px rgba(255,255,255,0.8))"> GOLPEADO</div>
     <div style="font-size:11px;color:rgba(232,220,200,.45);text-align:center;letter-spacing:.05em">${t('menu_subtitle')}</div>
     <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:280px">
       <button id="MS_LANG" style="align-self:flex-end;padding:6px 14px;border-radius:20px;border:1.5px solid rgba(201,168,76,.5);background:rgba(201,168,76,.1);color:var(--gold);font-family:Cinzel,serif;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation;letter-spacing:.06em">${t('lang_btn')} 🌐</button>
