@@ -1561,7 +1561,7 @@ function tiempoRestanteLabel(fechaStr){
   }catch(e){return{texto:'',urgente:false};}
 }
 
-// Elimina registros de historial y salas con más de 7 días de antigüedad
+// Elimina registros antiguos: historial/salas >7 días, visitas >3 meses
 // Usa RPC con SECURITY DEFINER para saltear RLS (anon key no puede hacer DELETE directo)
 async function limpiarDatosAntiguos(){
   try{
@@ -1580,6 +1580,11 @@ async function limpiarDatosAntiguos(){
       await sbFetchMinimal('/rest/v1/salas?created_at=lt.'+encodeURIComponent(cutoff),'DELETE');
       console.log('[CLEANUP] Salas eliminadas vía DELETE directo');
     }catch(e2){console.log('[CLEANUP] salas:',e2.message);}
+    try{
+      const cutoff=new Date(Date.now()-90*24*3600000).toISOString();
+      await sbFetchMinimal('/rest/v1/visitas?created_at=lt.'+encodeURIComponent(cutoff),'DELETE');
+      console.log('[CLEANUP] Visitas eliminadas vía DELETE directo');
+    }catch(e2){console.log('[CLEANUP] visitas:',e2.message);}
   }
   try{
     const corte=new Date(Date.now()-2*3600000).toISOString();
