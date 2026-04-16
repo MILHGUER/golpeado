@@ -1587,7 +1587,7 @@ async function limpiarDatosAntiguos(){
     }catch(e2){console.log('[CLEANUP] historial:',e2.message);}
     try{
       const cutoff=new Date(Date.now()-7*24*3600000).toISOString();
-      await sbFetchMinimal('/rest/v1/salas?created_at=lt.'+encodeURIComponent(cutoff),'DELETE');
+      await sbFetchMinimal('/rest/v1/salas?creado_at=lt.'+encodeURIComponent(cutoff),'DELETE');
       console.log('[CLEANUP] Salas eliminadas vía DELETE directo');
     }catch(e2){console.log('[CLEANUP] salas:',e2.message);}
     try{
@@ -1718,7 +1718,7 @@ async function eliminarSesionSolo(){
 async function verificarLimiteMulti(){
   try{
     const corte=new Date(Date.now()-MULTI_VENTANA_MS).toISOString();
-    const rows=await sbFetch('/rest/v1/salas?created_at=gt.'+encodeURIComponent(corte)+'&select=id');
+    const rows=await sbFetch('/rest/v1/salas?creado_at=gt.'+encodeURIComponent(corte)+'&select=id');
     return(rows?rows.length:0)<LIMITE_MULTI;
   }catch(e){
     console.log('[LIMITE] verificarLimiteMulti:',e.message);
