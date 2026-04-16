@@ -7,6 +7,9 @@
 <meta name="x5-orientation" content="portrait">
 <meta name="screen-orientation" content="portrait">
 <title>GOLPEADO</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" href="iconoyorshiregolpeado1.png">
+<link rel="apple-touch-icon" href="iconoyorshiregolpeado1.png">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Pro:wght@400;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -793,15 +796,15 @@ try{
 
     // Secuencia de flashes
     let idx=0;
-    const FLASH_DUR=110; // ms por carta
+    const FLASH_DUR=60; // ms por carta
     function nextFlash(){
       if(idx>=SPLASH_CARDS.length){
         // Mostrar portada
         cardDiv.style.opacity='0';
         playPageSound(0.7);
-        img.style.animation='splashPortada .7s cubic-bezier(.175,.885,.32,1.275) forwards';
+        img.style.animation='splashPortada .4s cubic-bezier(.175,.885,.32,1.275) forwards';
         img.style.opacity='1';
-        setTimeout(hideSplash,3200);
+        setTimeout(hideSplash,1800);
         return;
       }
       // Flash blanco
