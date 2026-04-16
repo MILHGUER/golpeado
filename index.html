@@ -546,6 +546,12 @@ es:{
   rank_nobody:'Nadie en el ranking aún.\n¡Sé el primero!',rank_you:' ← tú',
   rank_streak:'seguidas',rank_days_top:d=>`👑 ${d} en el top`,
   rank_hoy:'hoy',rank_1dia:'1 día',rank_dias:d=>`${d} días`,
+  gc_body:'¿Confirmás que querés declarar GOLPEADO?',
+  gc_sub:'Los demás jugadores mostrarán su juego y se contarán los puntos.',
+  gc_cancel:'Cancelar',gc_confirm:'¡Confirmar!',gc_declared:'¡Declaraste GOLPEADO!',
+  cl_title:'¿Confirmás?',
+  cl_body:pts=>`Tenés <strong style="color:#E8A84C">${pts} pts</strong> sobrantes y aún podés bajar combos o encajar cartas.<br><br>Si confirmás, <strong>no podrás volver atrás.</strong>`,
+  cl_keep:'Seguir jugando',cl_confirm:'Confirmar igual',
 },
 en:{
   lbl_deck:'DECK',lbl_discard:'DISCARD',
@@ -659,6 +665,12 @@ en:{
   rank_nobody:"Nobody in the ranking yet.\nBe the first!",rank_you:' ← you',
   rank_streak:'in a row',rank_days_top:d=>`👑 ${d} in the top`,
   rank_hoy:'today',rank_1dia:'1 day',rank_dias:d=>`${d} days`,
+  gc_body:'Confirm you want to declare GOLPEADO?',
+  gc_sub:'All players will reveal their hands and points will be counted.',
+  gc_cancel:'Cancel',gc_confirm:'Confirm!',gc_declared:'You declared GOLPEADO!',
+  cl_title:'Are you sure?',
+  cl_body:pts=>`You have <strong style="color:#E8A84C">${pts} pts</strong> leftover and can still lay down combos or fit cards.<br><br>If you confirm, <strong>you can't go back.</strong>`,
+  cl_keep:'Keep playing',cl_confirm:'Confirm anyway',
 }
 };
 
@@ -3047,23 +3059,23 @@ function actGolpe(){
   d.innerHTML=`
     <div style="background:#1a1a1a;border:1.5px solid #E24B4A;border-radius:12px;padding:20px;max-width:290px;width:100%;display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center">
       <div style="font-size:32px">🤛</div>
-      <div style="font-family:Cinzel,serif;font-size:15px;color:#E24B4A;letter-spacing:.08em">¡GOLPEADO!</div>
+      <div style="font-family:Cinzel,serif;font-size:15px;color:#E24B4A;letter-spacing:.08em">GOLPEADO!</div>
       <div style="font-size:11px;color:rgba(232,220,200,.8);line-height:1.6">
-        ¿Confirmás que querés declarar GOLPEADO?<br>
-        <span style="color:rgba(232,220,200,.5);font-size:10px">Los demás jugadores mostrarán su juego y se contarán los puntos.</span>
+        ${t('gc_body')}<br>
+        <span style="color:rgba(232,220,200,.5);font-size:10px">${t('gc_sub')}</span>
       </div>
       <div style="display:flex;gap:10px;width:100%">
         <button id="GC_NO" style="flex:1;padding:10px;border-radius:6px;border:1.5px solid rgba(232,220,200,.3);background:transparent;color:rgba(232,220,200,.7);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">
-          Cancelar
+          ${t('gc_cancel')}
         </button>
         <button id="GC_SI" style="flex:2;padding:10px;border-radius:6px;border:none;background:#E24B4A;color:#fff;font-family:Cinzel,serif;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation">
-          ¡Confirmar!
+          ${t('gc_confirm')}
         </button>
       </div>
     </div>`;
   $('G').appendChild(d);
   const close=()=>rmEl('GOLPE_CONF');
-  const confirm=()=>{rmEl('GOLPE_CONF');S.golpBy=0;showGolpeAnimation('¡Declaraste GOLPEADO!',()=>startReveal());};
+  const confirm=()=>{rmEl('GOLPE_CONF');S.golpBy=0;showGolpeAnimation(t('gc_declared'),()=>startReveal());};
   const no=document.getElementById('GC_NO');
   const si=document.getElementById('GC_SI');
   no.addEventListener('click',close);no.addEventListener('touchend',e=>{e.preventDefault();close();},{passive:false});
@@ -3964,17 +3976,16 @@ function showConfirmListo(pts){
   d.innerHTML=`
     <div style="background:#1a2e1a;border:1.5px solid #E8A84C;border-radius:12px;padding:20px;max-width:300px;width:100%;display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center">
       <div style="font-size:28px">⚠️</div>
-      <div style="font-family:Cinzel,serif;font-size:13px;color:#E8A84C;letter-spacing:.05em">¿Conformás?</div>
+      <div style="font-family:Cinzel,serif;font-size:13px;color:#E8A84C;letter-spacing:.05em">${t('cl_title')}</div>
       <div style="font-size:11px;color:rgba(232,220,200,.8);line-height:1.6">
-        Tenés <strong style="color:#E8A84C">${pts} pts</strong> sobrantes y aún podés bajar combos o encajar cartas.<br><br>
-        Si confirmás, <strong>no podrás volver atrás.</strong>
+        ${t('cl_body',pts)}
       </div>
       <div style="display:flex;gap:10px;width:100%">
         <button id="CONF_NO" style="flex:1;padding:10px;border-radius:6px;border:1.5px solid rgba(232,220,200,.4);background:transparent;color:rgba(232,220,200,.8);font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">
-          Seguir jugando
+          ${t('cl_keep')}
         </button>
         <button id="CONF_SI" style="flex:1;padding:10px;border-radius:6px;border:1.5px solid #c47d0a;background:#c47d0a;color:#fff;font-family:Cinzel,serif;font-size:10px;cursor:pointer;touch-action:manipulation">
-          Confirmar igual
+          ${t('cl_confirm')}
         </button>
       </div>
     </div>`;
