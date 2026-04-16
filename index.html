@@ -7260,17 +7260,23 @@ function getVoiceIndicator(slotLocal){
 // ── LIMPIEZA AUTOMÁTICA AL INICIAR ──
 setTimeout(()=>limpiarDatosAntiguos(),2000);
 
-// Liberar sesión solo al cerrar pestaña
-window.addEventListener('beforeunload',()=>{
+// Liberar sesión solo al cerrar/salir — compatible desktop y móvil
+function _borrarSesionSync(){
   if(!_sesionSoloId)return;
+  const sid=_sesionSoloId;
+  _sesionSoloId=null;
   try{
-    fetch(SB_URL+'/rest/v1/sesiones?id=eq.'+_sesionSoloId,{
+    fetch(SB_URL+'/rest/v1/sesiones?id=eq.'+sid,{
       method:'DELETE',
       headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'},
       keepalive:true
     });
   }catch(e){}
-});
+}
+// beforeunload — desktop (cierre de pestaña)
+window.addEventListener('beforeunload',_borrarSesionSync);
+// pagehide — móvil iOS/Android (más confiable que beforeunload en móvil)
+window.addEventListener('pagehide',_borrarSesionSync);
 
 </script>
 </body>
