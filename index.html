@@ -1773,7 +1773,7 @@ function mkHistorialCard(row){
       const pen=d.penalizaciones&&d.penalizaciones.some(p=>p.jugador===j.nombre);
       total+=pen?d.apuesta*2:d.apuesta;
     });
-    gananciaText=`💰 Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} · ${d.ganador} cobró <strong style="color:var(--gold)">${total}</strong> ficha${total>1?'s':''}`;
+    gananciaText=_lang==='en'?`💰 Bet: ${d.apuesta} chip${d.apuesta>1?'s':''} · ${d.ganador} collected <strong style="color:var(--gold)">${total}</strong> chip${total>1?'s':''}` :`💰 Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} · ${d.ganador} cobró <strong style="color:var(--gold)">${total}</strong> ficha${total>1?'s':''}`;
   } else if(d.tie&&d.apuesta>0){
     gananciaText=`💰 ${_lang==='en'?`Bet: ${d.apuesta} chip${d.apuesta>1?'s':''} · returned (tie)`:`Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} · devueltas por empate`}`;
   } else if(d.apuesta===0){
@@ -1950,14 +1950,14 @@ function showHistorialMesa(row){
       const penalizado=d.penalizaciones&&d.penalizaciones.some(p=>p.jugador===jug.nombre);
       totalCobrado+=penalizado?d.apuesta*2:d.apuesta;
     });
-    apuestaInfo=`<div style="font-size:9px;color:rgba(201,168,76,.7);margin-top:2px">💰 Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} por jugador · ${d.ganador} cobró ${totalCobrado} ficha${totalCobrado>1?'s':''}</div>`;
+    apuestaInfo=_lang==='en'?`<div style="font-size:9px;color:rgba(201,168,76,.7);margin-top:2px">💰 Bet: ${d.apuesta} chip${d.apuesta>1?'s':''} per player · ${d.ganador} collected ${totalCobrado} chip${totalCobrado>1?'s':''}</div>`:`<div style="font-size:9px;color:rgba(201,168,76,.7);margin-top:2px">💰 Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} por jugador · ${d.ganador} cobró ${totalCobrado} ficha${totalCobrado>1?'s':''}</div>`;
   } else if(d.tie&&d.apuesta>0){
-    apuestaInfo=`<div style="font-size:9px;color:rgba(232,220,200,.45);margin-top:2px">💰 Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} — devueltas por empate</div>`;
+    apuestaInfo=`<div style="font-size:9px;color:rgba(232,220,200,.45);margin-top:2px">💰 ${_lang==='en'?`Bet: ${d.apuesta} chip${d.apuesta>1?'s':''} — returned (tie)`:`Apuesta: ${d.apuesta} ficha${d.apuesta>1?'s':''} — devueltas por empate`}</div>`;
   }
   resDiv.innerHTML=`
-    <div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:${ganadorColor}">${d.tie?'🤝 EMPATE':'🏆 '+d.ganador+' gana'}</div>
+    <div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:${ganadorColor}">${d.tie?(_lang==='en'?'🤝 TIE':'🤝 EMPATE'):('🏆 '+d.ganador+(_lang==='en'?' wins':' gana'))}</div>
     <div style="font-size:9px;color:rgba(232,220,200,.6);margin-top:3px">${d.jugadores.map(j=>`<span style="color:${j.gano&&!d.tie?'var(--gold)':'rgba(232,220,200,.6)'};font-weight:${j.gano&&!d.tie?'700':'400'}">${j.nombre} ${j.puntaje}pts${j.gano&&!d.tie?' 🏆':''}</span>`).join(' · ')}</div>
-    ${d.golpeador?`<div style="font-size:9px;color:rgba(232,220,200,.45);margin-top:2px">👊 ${d.golpeador}${d.golpeadorGano?'':' (no ganó)'}</div>`:''}
+    ${d.golpeador?`<div style="font-size:9px;color:rgba(232,220,200,.45);margin-top:2px">👊 ${d.golpeador}${d.golpeadorGano?'':(_lang==='en'?' (didn\'t win)':' (no ganó)')}</div>`:''}
     ${d.penalizaciones&&d.penalizaciones.length?`<div style="font-size:8px;color:#E24B4A;margin-top:2px">⚠️ ${d.penalizaciones.map(p=>p.jugador+': '+p.razon).join(' · ')}</div>`:''}
     ${apuestaInfo}
     <div style="font-size:8px;color:rgba(232,220,200,.25);margin-top:3px;font-family:Cinzel,serif;letter-spacing:.04em">📜 HISTORIAL · ${historialFechaLabel(row.fecha)}</div>
@@ -2700,7 +2700,7 @@ function calcPayments(winners,adj,tie,gp,gWon){
     const golpoSinGanar=gp===i&&!gWon&&!tie;
     const esPenalizado=golpoSinGanar||tieneComodines;
     const monto=esPenalizado?BET*2:BET;
-    const razon=golpoSinGanar?'golpeó sin ganar':tieneComodines?'2 comodines':'pierde';
+    const razon=_lang==='en'?(golpoSinGanar?'declared GOLPEADO without winning':tieneComodines?'2 wilds':'loses'):(golpoSinGanar?'golpeó sin ganar':tieneComodines?'2 comodines':'pierde');
     payments.push({from:i,to:winner,amount:monto,reason:razon});
     // solo el host (o modo solo) actualiza el banco, y solo la primera vez
     if(!S._pagoProcessed&&(MP.mode!=='multi'||MP.isHost)){
@@ -3587,7 +3587,7 @@ function revealNext(){
               // Pequeño toast final con el ganador después de las penalizaciones
               const toastDiv=document.createElement('div');
               toastDiv.style.cssText='position:absolute;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:1px solid '+PCOLOR[ws[0]]+';border-radius:8px;padding:8px 16px;font-family:Cinzel,serif;font-size:11px;color:'+PCOLOR[ws[0]]+';z-index:760;white-space:nowrap;pointer-events:none';
-              toastDiv.textContent='🏆 '+PNAME(ws[0])+' gana con '+adj2[ws[0]]+' pts';
+              toastDiv.textContent='🏆 '+PNAME(ws[0])+(_lang==='en'?' wins with ':' gana con ')+adj2[ws[0]]+' pts';
               $('G').appendChild(toastDiv);
               setTimeout(()=>toastDiv.remove(),3000);
             }
@@ -4444,7 +4444,7 @@ function drawHand(){
       // Label pequeño
       const lbl=document.createElement('div');
       lbl.style.cssText='font-family:Cinzel,serif;font-size:7px;color:var(--gold);text-align:center;letter-spacing:.05em;margin-bottom:2px;text-shadow:0 1px 4px rgba(0,0,0,.8)';
-      lbl.textContent='DESCARTE';
+      lbl.textContent=_lang==='en'?'DISCARD':'DESCARTE';
       dtDiv.appendChild(lbl);
       // Wrapper relativo — contiene carta + X
       const wrapper=document.createElement('div');
@@ -4461,7 +4461,7 @@ function drawHand(){
       const msg=document.createElement('div');
       msg.style.cssText='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.72);border-radius:6px;padding:4px;z-index:2;pointer-events:none';
       const msgFz=window.innerWidth<600?'10px':'8px';
-      msg.innerHTML=`<span style="font-family:Cinzel,serif;font-size:${msgFz};color:#fff;text-align:center;line-height:1.6;letter-spacing:.03em;text-shadow:0 1px 3px rgba(0,0,0,.9)">Seleccioná<br>2+ cartas<br>de tu mano<br>para combo</span>`;
+      msg.innerHTML=`<span style="font-family:Cinzel,serif;font-size:${msgFz};color:#fff;text-align:center;line-height:1.6;letter-spacing:.03em;text-shadow:0 1px 3px rgba(0,0,0,.9)">${_lang==='en'?'Select<br>2+ cards<br>from hand<br>for combo':'Seleccioná<br>2+ cartas<br>de tu mano<br>para combo'}</span>`;
       ce.appendChild(msg);
       wrapper.appendChild(ce);
       // X roja — fuera del clip, en esquina superior derecha del wrapper
@@ -4895,7 +4895,7 @@ function showFinalOv(){
   let payHtml='';
   if(BET>0&&!tie&&payments.length){
     payHtml=`<div style="width:100%;max-width:300px;border-top:1px solid rgba(201,168,76,.2);padding-top:10px">
-      <div style="font-family:Cinzel,serif;font-size:9px;color:var(--gold);margin-bottom:6px;letter-spacing:.05em">💰 PAGOS (apuesta: ${BET} ficha${BET>1?'s':''})</div>`;
+      <div style="font-family:Cinzel,serif;font-size:9px;color:var(--gold);margin-bottom:6px;letter-spacing:.05em">${_lang==='en'?`💰 PAYMENTS (bet: ${BET} chip${BET>1?'s':''})` :`💰 PAGOS (apuesta: ${BET} ficha${BET>1?'s':''})`}</div>`;
     payments.forEach(p=>{
       const chipCls=CHIPS.find(c=>c.v===p.amount)||CHIPS.find(c=>c.v===50);
       const chipColor=p.amount===1?'#e8e8e8':p.amount===5?'#C0392B':p.amount===10?'#2471A3':p.amount===20?'#1E8449':'#C9A84C';
