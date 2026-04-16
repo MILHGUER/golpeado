@@ -1562,20 +1562,24 @@ function tiempoRestanteLabel(fechaStr){
 }
 
 // Elimina registros de historial y salas con más de 7 días de antigüedad
+// Usa RPC con SECURITY DEFINER para saltear RLS (anon key no puede hacer DELETE directo)
 async function limpiarDatosAntiguos(){
   try{
-    const cutoff=new Date(Date.now()-7*24*3600000).toISOString();
-    await sbFetchMinimal('/rest/v1/historial?fecha=lt.'+encodeURIComponent(cutoff),'DELETE');
-    console.log('[CLEANUP] Historial antiguo eliminado (corte:',cutoff,')');
+    await sbFetchMinimal('/rest/v1/rpc/cleanup_old_records','POST',{});
+    console.log('[CLEANUP] cleanup_old_records ejecutado OK');
   }catch(e){
-    console.log('[CLEANUP] historial:',e.message);
-  }
-  try{
-    const cutoff=new Date(Date.now()-7*24*3600000).toISOString();
-    await sbFetchMinimal('/rest/v1/salas?created_at=lt.'+encodeURIComponent(cutoff),'DELETE');
-    console.log('[CLEANUP] Salas antiguas eliminadas');
-  }catch(e){
-    console.log('[CLEANUP] salas:',e.message);
+    // Fallback: intentar DELETE directo (solo funciona si RLS lo permite)
+    console.log('[CLEANUP] RPC falló, intentando DELETE directo:',e.message);
+    try{
+      const cutoff=new Date(Date.now()-7*24*3600000).toISOString();
+      await sbFetchMinimal('/rest/v1/historial?fecha=lt.'+encodeURIComponent(cutoff),'DELETE');
+      console.log('[CLEANUP] Historial eliminado vía DELETE directo');
+    }catch(e2){console.log('[CLEANUP] historial:',e2.message);}
+    try{
+      const cutoff=new Date(Date.now()-7*24*3600000).toISOString();
+      await sbFetchMinimal('/rest/v1/salas?created_at=lt.'+encodeURIComponent(cutoff),'DELETE');
+      console.log('[CLEANUP] Salas eliminadas vía DELETE directo');
+    }catch(e2){console.log('[CLEANUP] salas:',e2.message);}
   }
   try{
     const corte=new Date(Date.now()-2*3600000).toISOString();
@@ -6130,7 +6134,7 @@ function showLobbyLoading(msg){
   const ov=document.createElement('div');ov.id='LOBBY_OV';
   ov.style.cssText='position:absolute;inset:0;background:rgba(0,0,0,.97);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:800;padding:24px';
   ov.innerHTML=`<div style="font-family:Cinzel,serif;font-size:16px;color:var(--gold)">${msg}</div>
-    <div style="font-size:11px;color:rgba(232,220,200,.4)">Conectando con el servidor...</div>`;
+    <div style="font-size:11px;color:rgba(232,220,200,.4)">${_lang==='en'?'Connecting to server...':'Conectando con el servidor...'}</div>`;
   $('G').appendChild(ov);
 }
 
@@ -6143,36 +6147,36 @@ function buildLobbyUI(estado,isHost){
   // enlace dinámico — usa la URL actual del navegador, sin importar el dominio
   const baseUrl=window.location.origin+window.location.pathname;
   const enlace=baseUrl+'#sala='+MP.salaId;
-  const mensajeWA=`🃏 ¡Te invito a jugar GOLPEADO!\nEntrá acá: ${enlace}\nO ingresá el código: *${MP.salaId}*`;
+  const mensajeWA=_lang==='en'?`🃏 I invite you to play GOLPEADO!\nJoin here: ${enlace}\nOr enter the code: *${MP.salaId}*`:`🃏 ¡Te invito a jugar GOLPEADO!\nEntrá acá: ${enlace}\nO ingresá el código: *${MP.salaId}*`;
 
   ov.innerHTML=`
-    <div style="font-family:Cinzel,serif;font-size:20px;color:var(--gold)">🃏 Sala de espera</div>
+    <div style="font-family:Cinzel,serif;font-size:20px;color:var(--gold)">🃏 ${_lang==='en'?'Waiting Room':'Sala de espera'}</div>
     <div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:8px 14px;text-align:center;width:100%;max-width:300px">
-      <div style="font-size:9px;color:rgba(232,220,200,.5);font-family:Cinzel,serif;margin-bottom:4px">CÓDIGO DE SALA</div>
+      <div style="font-size:9px;color:rgba(232,220,200,.5);font-family:Cinzel,serif;margin-bottom:4px">${_lang==='en'?'ROOM CODE':'CÓDIGO DE SALA'}</div>
       <div style="font-family:Cinzel,serif;font-size:22px;color:var(--gold);letter-spacing:.15em">${MP.salaId}</div>
       <div style="display:flex;gap:6px;margin-top:6px;justify-content:center">
-        <button id="LB_COPY" style="padding:4px 10px;border-radius:4px;border:1px solid rgba(201,168,76,.4);background:transparent;color:rgba(201,168,76,.7);font-size:9px;cursor:pointer;touch-action:manipulation">📋 Copiar enlace</button>
+        <button id="LB_COPY" style="padding:4px 10px;border-radius:4px;border:1px solid rgba(201,168,76,.4);background:transparent;color:rgba(201,168,76,.7);font-size:9px;cursor:pointer;touch-action:manipulation">📋 ${_lang==='en'?'Copy link':'Copiar enlace'}</button>
         <button id="LB_WA" style="padding:4px 10px;border-radius:4px;border:1px solid #25D366;background:#25D36622;color:#25D366;font-size:9px;cursor:pointer;touch-action:manipulation">💬 WhatsApp</button>
       </div>
     </div>
     <div id="LB_JUGADORES" style="width:100%;max-width:300px;display:flex;flex-direction:column;gap:6px"></div>
     ${isHost?`
     <div style="display:flex;flex-direction:column;gap:6px;width:100%;max-width:300px">
-      <div style="font-size:9px;color:rgba(232,220,200,.5);font-family:Cinzel,serif">APUESTA POR JUGADOR</div>
+      <div style="font-size:9px;color:rgba(232,220,200,.5);font-family:Cinzel,serif">${_lang==='en'?'BET PER PLAYER':'APUESTA POR JUGADOR'}</div>
       <div id="LB_CHIPS" style="position:relative;width:100%;height:100px;display:flex;align-items:flex-end;justify-content:center"></div>
-      <div id="LB_APUESTA_LBL" style="font-size:10px;color:rgba(232,220,200,.4);text-align:center">Sin apuesta</div>
+      <div id="LB_APUESTA_LBL" style="font-size:10px;color:rgba(232,220,200,.4);text-align:center">${_lang==='en'?'No bet':'Sin apuesta'}</div>
     </div>
-    <button id="LB_INICIAR" disabled style="width:100%;max-width:300px;padding:12px;border-radius:8px;border:none;background:rgba(201,168,76,.3);color:rgba(201,168,76,.5);font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:not-allowed;touch-action:manipulation">Iniciar partida (mín. 2 jugadores)</button>
+    <button id="LB_INICIAR" disabled style="width:100%;max-width:300px;padding:12px;border-radius:8px;border:none;background:rgba(201,168,76,.3);color:rgba(201,168,76,.5);font-family:Cinzel,serif;font-size:13px;font-weight:700;cursor:not-allowed;touch-action:manipulation">${_lang==='en'?'Start game (min. 2 players)':'Iniciar partida (mín. 2 jugadores)'}</button>
     `:`
-    <div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center;font-style:italic">Esperando que el host inicie la partida...</div>
+    <div style="font-size:11px;color:rgba(232,220,200,.5);text-align:center;font-style:italic">${_lang==='en'?'Waiting for the host to start the game...':'Esperando que el host inicie la partida...'}</div>
     <div id="LB_APUESTA_LBL" style="font-size:11px;color:var(--gold);text-align:center;font-weight:700"></div>
     `}
     <div style="display:flex;gap:6px;width:100%;max-width:300px;margin-top:4px;flex-wrap:wrap">
-      <button id="LB_BACK" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.4);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">✏️ Nombre</button>
-      <button id="LB_INICIO" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(74,158,232,.4);background:rgba(74,158,232,.08);color:rgba(74,158,232,.9);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">🏠 Inicio</button>
-      <button id="LB_HIST" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.15);background:transparent;color:rgba(232,220,200,.4);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">📜 Historial</button>
-      <button id="LB_HTP" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">❓ Cómo jugar</button>
-      <button id="LB_CUE" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(201,168,76,.4);background:transparent;color:rgba(201,168,76,.7);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">💰 Cuentas</button>
+      <button id="LB_BACK" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.2);background:transparent;color:rgba(232,220,200,.4);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">✏️ ${_lang==='en'?'Name':'Nombre'}</button>
+      <button id="LB_INICIO" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(74,158,232,.4);background:rgba(74,158,232,.08);color:rgba(74,158,232,.9);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">🏠 ${_lang==='en'?'Home':'Inicio'}</button>
+      <button id="LB_HIST" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.15);background:transparent;color:rgba(232,220,200,.4);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">📜 ${_lang==='en'?'History':'Historial'}</button>
+      <button id="LB_HTP" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(232,220,200,.25);background:transparent;color:rgba(232,220,200,.6);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">❓ ${_lang==='en'?'How to play':'Cómo jugar'}</button>
+      <button id="LB_CUE" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(201,168,76,.4);background:transparent;color:rgba(201,168,76,.7);font-family:Cinzel,serif;font-size:9px;cursor:pointer;touch-action:manipulation;min-width:70px">💰 ${_lang==='en'?'Accounts':'Cuentas'}</button>
     </div>`;
 
   $('G').appendChild(ov);
@@ -6224,8 +6228,8 @@ function buildLobbyUI(estado,isHost){
       // Intentar clipboard API (funciona en iOS con HTTPS)
       if(navigator.clipboard&&window.isSecureContext){
         navigator.clipboard.writeText(enlace).then(()=>{
-          copyBtn.textContent='✓ Copiado!';
-          setTimeout(()=>copyBtn.textContent='📋 Copiar enlace',2000);
+          copyBtn.textContent=_lang==='en'?'✓ Copied!':'✓ Copiado!';
+          setTimeout(()=>{copyBtn.textContent='📋 '+(_lang==='en'?'Copy link':'Copiar enlace');},2000);
         }).catch(()=>fallbackCopy());
       } else {
         fallbackCopy();
@@ -6238,9 +6242,9 @@ function buildLobbyUI(estado,isHost){
       ta.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;padding:8px;font-size:14px;border:1px solid #ccc;border-radius:4px;background:#fff;color:#000;z-index:9999';
       document.body.appendChild(ta);
       ta.focus();ta.select();
-      try{document.execCommand('copy');copyBtn.textContent='✓ Copiado!';}
-      catch(e){copyBtn.textContent='📋 Copiar';}
-      setTimeout(()=>{ta.remove();copyBtn.textContent='📋 Copiar enlace';},2500);
+      try{document.execCommand('copy');copyBtn.textContent=_lang==='en'?'✓ Copied!':'✓ Copiado!';}
+      catch(e){copyBtn.textContent='📋 '+(_lang==='en'?'Copy':'Copiar');}
+      setTimeout(()=>{ta.remove();copyBtn.textContent='📋 '+(_lang==='en'?'Copy link':'Copiar enlace');},2500);
     };
     copyBtn.addEventListener('click',doCopy);copyBtn.addEventListener('touchend',e=>{e.preventDefault();doCopy();},{passive:false});
   }
@@ -6300,7 +6304,7 @@ function buildLobbyUI(estado,isHost){
         apuestaSeleccionada=chip.v;
         const lbl=document.getElementById('LB_APUESTA_LBL');
         if(lbl){
-          lbl.textContent=chip.v===0?'Sin apuesta':`Apuesta: ${chip.v} ficha${chip.v>1?'s':''} por jugador`;
+          lbl.textContent=chip.v===0?(_lang==='en'?'No bet':'Sin apuesta'):(_lang==='en'?`Bet: ${chip.v} chip${chip.v>1?'s':''} per player`:`Apuesta: ${chip.v} ficha${chip.v>1?'s':''} por jugador`);
           lbl.style.color=chip.v===0?'rgba(232,220,200,.4)':'var(--gold)';
         }
         // abanico: resaltar seleccionada
@@ -6330,10 +6334,10 @@ function buildLobbyUI(estado,isHost){
     if(btnIniciar){
       const doIniciar=async()=>{
         const row=await sbGet(MP.salaId);
-        if(!row){showError('No se pudo leer la sala.');return;}
+        if(!row){showError(_lang==='en'?'Could not read the room.':'No se pudo leer la sala.');return;}
         const est=row.estado;
         if(est.jugadores.length<2){
-          alert('Necesitás mínimo 2 jugadores para iniciar.');return;
+          alert(_lang==='en'?'You need at least 2 players to start.':'Necesitás mínimo 2 jugadores para iniciar.');return;
         }
         // Confirmar si no seleccionó apuesta
         if(!apuestaSeleccionada||apuestaSeleccionada===0){
@@ -6380,11 +6384,11 @@ function actualizarLobbyUI(estado){
       lbl.appendChild(mkChip(estado.apuesta,28));
       const txt=document.createElement('span');
       txt.style.cssText='font-size:10px;color:var(--gold);font-family:Cinzel,serif';
-      txt.textContent=`Apuesta: ${estado.apuesta} ficha${estado.apuesta>1?'s':''}`;
+      txt.textContent=_lang==='en'?`Bet: ${estado.apuesta} chip${estado.apuesta>1?'s':''}`:`Apuesta: ${estado.apuesta} ficha${estado.apuesta>1?'s':''}`;
       lbl.appendChild(txt);
       lbl.style.cssText='display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap';
     } else {
-      lbl.textContent='Sin apuesta';
+      lbl.textContent=_lang==='en'?'No bet':'Sin apuesta';
       lbl.style.color='rgba(232,220,200,.4)';
     }
   }
@@ -6395,7 +6399,7 @@ function actualizarLobbyUI(estado){
     d.style.cssText=`display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:7px;background:rgba(0,0,0,.3);border:1px solid ${PCOLOR[idx]}44`;
     d.innerHTML=`
       <div style="width:10px;height:10px;border-radius:50%;background:${j.conectado?'#7be87b':'#E24B4A'}"></div>
-      <span style="font-family:Cinzel,serif;font-size:12px;color:${PCOLOR[idx]};flex:1">${j.nombre}${isMe?' (tú)':''}${isHost2?' 👑':''}</span>
+      <span style="font-family:Cinzel,serif;font-size:12px;color:${PCOLOR[idx]};flex:1">${j.nombre}${isMe?(_lang==='en'?' (you)':' (tú)'):''}${isHost2?' 👑':''}</span>
       <span style="font-size:9px;color:rgba(232,220,200,.4)">Slot ${idx+1}</span>`;
     // host puede retirar jugadores que no sean él
     if(MP.isHost&&!isMe){
@@ -6412,7 +6416,7 @@ function actualizarLobbyUI(estado){
   for(let i=estado.jugadores.length;i<3;i++){
     const d=document.createElement('div');
     d.style.cssText='display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:7px;background:rgba(0,0,0,.15);border:1px dashed rgba(255,255,255,.1)';
-    d.innerHTML=`<span style="font-size:10px;color:rgba(232,220,200,.25);font-style:italic">Esperando jugador ${i+1}...</span>`;
+    d.innerHTML=`<span style="font-size:10px;color:rgba(232,220,200,.25);font-style:italic">${_lang==='en'?`Waiting for player ${i+1}...`:`Esperando jugador ${i+1}...`}</span>`;
     jDiv.appendChild(d);
   }
   // actualizar botón iniciar
@@ -6423,7 +6427,7 @@ function actualizarLobbyUI(estado){
     btnIniciar.style.background=puedeIniciar?'var(--gold)':'rgba(201,168,76,.3)';
     btnIniciar.style.color=puedeIniciar?'#1a1230':'rgba(201,168,76,.5)';
     btnIniciar.style.cursor=puedeIniciar?'pointer':'not-allowed';
-    btnIniciar.textContent=puedeIniciar?`Iniciar partida (${estado.jugadores.length} jugadores) →`:`Iniciar partida (mín. 2 jugadores)`;
+    btnIniciar.textContent=puedeIniciar?(_lang==='en'?`Start game (${estado.jugadores.length} players) →`:`Iniciar partida (${estado.jugadores.length} jugadores) →`):(_lang==='en'?'Start game (min. 2 players)':'Iniciar partida (mín. 2 jugadores)');
   }
 }
 
