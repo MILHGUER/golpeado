@@ -38,9 +38,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 .adot{width:11px;height:11px;border-radius:50%;background:var(--gold);display:inline-block;margin-right:5px;animation:pulse .9s infinite;flex-shrink:0}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* CENTER — usa flex y se adapta al espacio disponible */
-.czone{display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;gap:3px;min-height:0;flex:1}
-/* COMBOS — sin max-height fijo, crece con el contenido */
-#TC{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:flex-start;width:100%;padding:0 4px;overflow-y:auto;max-height:40vh}
+.czone{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;min-height:0;flex:1;overflow:hidden}
+/* COMBOS — altura fijada dinámicamente por JS en adjustTCHeight() */
+#TC{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:flex-start;width:100%;padding:0 4px 4px;overflow-y:auto;box-sizing:border-box}
 .cset{display:flex;gap:1px;padding:2px;border-radius:4px;background:rgba(0,0,0,.25);border:1px solid rgba(201,168,76,.18)}
 .dkarea{display:flex;gap:14px;align-items:center;justify-content:center;flex-shrink:0}
 .dklbl{text-align:center;font-size:8px;color:rgba(201,168,76,.4);margin-top:2px;font-family:Cinzel,serif}
@@ -53,7 +53,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 #DP{width:var(--cw);height:var(--ch);border-radius:4px;border:1.5px dashed rgba(201,168,76,.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;overflow:visible;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .dpmt{font-size:7px;color:rgba(201,168,76,.4);font-family:'Cinzel',serif;text-align:center;line-height:1.3}
 .dpct{position:absolute;top:-7px;right:-7px;background:var(--gold);color:#1a1230;font-family:'Cinzel',serif;font-size:8px;font-weight:700;border-radius:10px;padding:1px 5px;z-index:2;pointer-events:none}
-#MSG{font-size:11px;color:#f0e8d0;text-align:center;font-style:italic;padding:2px 8px;min-height:16px;line-height:1.4;text-shadow:0 1px 3px rgba(0,0,0,.8);font-weight:600}
+#MSG{font-size:11px;color:#f0e8d0;text-align:center;font-style:italic;padding:2px 8px;min-height:16px;line-height:1.4;text-shadow:0 1px 3px rgba(0,0,0,.8);font-weight:600;flex-shrink:0}
 @keyframes tuTurno{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.05)}}
 .tu-turno{animation:tuTurno 1s ease-in-out infinite;color:var(--gold)!important;font-weight:700!important;text-shadow:0 0 12px rgba(201,168,76,.8)!important;font-style:normal!important}
 /* PLAYER ZONE */
@@ -82,8 +82,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 @media(min-width:1200px){.card.hand-card{grid-template-rows:26px 1fr 26px}}
 .card.draggable{touch-action:pan-y}
 .card.red{color:#C0392B}.card.blk{color:#111111}.card.green{color:#1a6e1a}.card.orange{color:#1E90FF}
-.card.jkcard{background:#1a0a3a;border-color:#7B5AAA;border-width:1.5px}
-.card.wlcard{background:#0a1f2e;border-color:#1a7a8a;border-width:1.5px}
+.card.jkcard{background:#0d1a36;border-color:#C9A84C;border-width:2px;box-shadow:0 0 6px rgba(201,168,76,.35)}
+.card.wlcard{background:#0d1f0a;border-color:#8B44CC;border-width:2px;box-shadow:0 0 6px rgba(139,68,204,.35)}
 /* Imagen comodín ocupa toda la carta, símbolos encima */
 .card.jkcard .cc,.card.wlcard .cc{position:absolute;inset:0;z-index:0}
 .card.jkcard .cc img,.card.wlcard .cc img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
@@ -4014,7 +4014,17 @@ function showConfirmListo(pts){
 }
 
 // RENDER
-function redraw(){document.querySelectorAll('#JK_GHOST').forEach(g=>g.remove());drawBots();drawCenter();drawHand();drawHUD();drawActs();drawVoiceUI();}
+function adjustTCHeight(){
+  const tc=$('TC'),czone=document.querySelector('.czone'),dkarea=document.querySelector('.dkarea'),msg=$('MSG');
+  if(!tc||!czone||!dkarea||!msg)return;
+  const czH=czone.getBoundingClientRect().height;
+  const dkH=dkarea.getBoundingClientRect().height;
+  const msgH=msg.getBoundingClientRect().height;
+  // 2 gaps de 3px entre los 3 hijos de .czone
+  const avail=czH-dkH-msgH-6;
+  tc.style.maxHeight=Math.max(avail,60)+'px';
+}
+function redraw(){document.querySelectorAll('#JK_GHOST').forEach(g=>g.remove());drawBots();drawCenter();drawHand();drawHUD();drawActs();drawVoiceUI();requestAnimationFrame(adjustTCHeight);}
 
 function mkBack(){const e=document.createElement('div');e.className='card back';e.innerHTML='<div style="grid-row:1/-1;overflow:hidden"><div class="cbk" style="height:100%"></div></div>';return e;}
 
@@ -5179,7 +5189,7 @@ function showHowToPlay(onClose){
       <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:8px;padding:10px 12px">
         <div style="color:var(--gold);font-size:12px;font-weight:700;margin-bottom:6px">GRUPO — mismo número, distintos palos</div>
         <div style="color:rgba(232,220,200,.8);font-size:13px;letter-spacing:.05em">7♥ 7♦ 7♣ &nbsp;/&nbsp; K♠ K♥ K♦ K♣</div>
-        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:10px"><div style="width:42px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;border:1.5px solid rgba(15,110,86,.5)" id="HTP_WSVG"></div><div><div style="color:#0F6E56;font-size:12px;font-weight:700">✦ Grupal — comodín de GRUPO</div><div style="color:rgba(232,220,200,.7);font-size:11px;line-height:1.6;margin-top:3px">Reemplaza cualquier carta en un grupo. Solo sirve en grupos, no en escaleras. Vale 30 pts si queda como sobrante.</div></div></div>
+        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:10px"><div style="width:42px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;border:2px solid #8B44CC;box-shadow:0 0 6px rgba(139,68,204,.4)" id="HTP_WSVG"></div><div><div style="color:#8B44CC;font-size:12px;font-weight:700">✦ Grupal — comodín de GRUPO</div><div style="color:rgba(232,220,200,.7);font-size:11px;line-height:1.6;margin-top:3px">Reemplaza cualquier carta en un grupo. Solo sirve en grupos, no en escaleras. Vale 30 pts si queda como sobrante.</div></div></div>
       </div>
       <div style="background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.2);border-radius:8px;padding:8px 12px"><div style="color:#E24B4A;font-size:11px;line-height:1.6">⚠️ Si terminás con <strong>★ Joker Y ✦ Grupal</strong> ambos como sobrantes — pagás el doble (se suman 60 pts extra).</div></div>
       <p style="color:rgba(232,220,200,.6);font-size:11px;line-height:1.6">Podés <strong>encajar</strong> cartas sueltas en combos existentes para reducir tus puntos sobrantes.</p>
@@ -5228,7 +5238,7 @@ function showHowToPlay(onClose){
       <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);border-radius:8px;padding:10px 12px">
         <div style="color:var(--gold);font-size:12px;font-weight:700;margin-bottom:6px">GROUP — same number, different suits</div>
         <div style="color:rgba(232,220,200,.8);font-size:13px;letter-spacing:.05em">7♥ 7♦ 7♣ &nbsp;/&nbsp; K♠ K♥ K♦ K♣</div>
-        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:10px"><div style="width:42px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;border:1.5px solid rgba(15,110,86,.5)" id="HTP_WSVG"></div><div><div style="color:#0F6E56;font-size:12px;font-weight:700">✦ Group Wild — GROUP wild</div><div style="color:rgba(232,220,200,.7);font-size:11px;line-height:1.6;margin-top:3px">Replaces any card in a group. Only works in groups, not runs. Worth 30 pts if leftover.</div></div></div>
+        <div style="margin-top:8px;display:flex;align-items:flex-start;gap:10px"><div style="width:42px;height:62px;border-radius:4px;overflow:hidden;flex-shrink:0;border:2px solid #8B44CC;box-shadow:0 0 6px rgba(139,68,204,.4)" id="HTP_WSVG"></div><div><div style="color:#8B44CC;font-size:12px;font-weight:700">✦ Group Wild — GROUP wild</div><div style="color:rgba(232,220,200,.7);font-size:11px;line-height:1.6;margin-top:3px">Replaces any card in a group. Only works in groups, not runs. Worth 30 pts if leftover.</div></div></div>
       </div>
       <div style="background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.2);border-radius:8px;padding:8px 12px"><div style="color:#E24B4A;font-size:11px;line-height:1.6">⚠️ If you end with <strong>★ Joker AND ✦ Group Wild</strong> both as leftovers — you pay double (60 extra pts).</div></div>
       <p style="color:rgba(232,220,200,.6);font-size:11px;line-height:1.6">You can <strong>fit</strong> loose cards into existing combos to reduce your leftover points.</p>
