@@ -3170,7 +3170,9 @@ function actTakeDisc(){
   const handCards=S.hands[0];
   const autoSel=[];
   outer2:for(let i=0;i<handCards.length;i++){
+    if(handCards[i].jk||handCards[i].wl)continue;
     for(let j=i+1;j<handCards.length;j++){
+      if(handCards[j].jk||handCards[j].wl)continue;
       if(validCombo([top,handCards[i],handCards[j]])){
         autoSel.push(handCards[i].id,handCards[j].id);
         break outer2;
