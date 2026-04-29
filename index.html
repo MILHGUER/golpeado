@@ -85,8 +85,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--felt);color:#e
 .card.jkcard{background:#FFFFFF;border-color:#C9A84C;border-width:2px;box-shadow:0 0 6px rgba(201,168,76,.35)}
 .card.wlcard{background:#FFFFFF;border-color:#8B44CC;border-width:2px;box-shadow:0 0 6px rgba(139,68,204,.35)}
 /* Imagen comodín ocupa toda la carta, símbolos encima */
-.card.jkcard .cc,.card.wlcard .cc{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.card.jkcard .cc img,.card.wlcard .cc img{width:100%;height:100%;object-fit:contain;object-position:center;background:transparent;display:block}
+.card.jkcard .cc,.card.wlcard .cc{position:absolute;inset:0;z-index:0}
+.card.jkcard .cc img,.card.wlcard .cc img{width:100%;height:100%;object-fit:contain;object-position:center;background:transparent;display:block;pointer-events:none}
 .card.jkcard .cn,.card.wlcard .cn{position:relative;z-index:2;line-height:14px;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.8)}
 .card.jkcard .cn .cns,.card.wlcard .cn .cns{display:none}
 .card.jkcard .cn.b,.card.wlcard .cn.b{display:none}
