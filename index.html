@@ -1100,11 +1100,12 @@ function hasBothWilds(hand){return hand.some(c=>c.jk)&&hand.some(c=>c.wl);}
 // Detecta si un jugador usó ambos comodines (en mano O en combos bajados)
 function usedBothWilds(i){
   try{
-    // Mano + propios combos bajados
+    // Mano + propios combos bajados (excluir cartas encajadas por OTRO jugador en mis combos)
     const handCards=S.hands[i]||[];
-    const shownOwn=(S.shown[i]||[]).flatMap(combo=>(combo&&combo.cards)||[]);
+    const shownOwn=(S.shown[i]||[]).flatMap(combo=>(combo&&combo.cards)||[])
+      .filter(c=>c&&(c._fittedBy===undefined||c._fittedBy===i));
 
-    // Cartas encajadas en combos AJENOS usando _fittedBy (más confiable que _owner en multi)
+    // Cartas encajadas por MÍ en combos AJENOS usando _fittedBy
     const encajadasMias=S.shown.flatMap((shown,pi)=>{
       if(pi===i)return [];
       return (shown||[]).flatMap(combo=>(combo&&combo.cards)||[]);
